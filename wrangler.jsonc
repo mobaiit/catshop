@@ -2,6 +2,12 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "catshop",
   "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "catshop.us.ci",
+      "custom_domain": true
+    }
+  ],
   "compatibility_date": "2026-03-12",
   "main": "vike:server-entry",
   "send_email": [
@@ -13,7 +19,7 @@
     {
       "binding": "DB",
       "database_name": "catshop_db",
-      "database_id": "da3103d0-b2ff-43ae-8ac6-04dd2c54b511",
+      "database_id": "f0268736-9705-40cd-a8aa-9e451a0345a0",
       "migrations_dir": "database/migrations",
     }
   ],
