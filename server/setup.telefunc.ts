@@ -11,6 +11,7 @@ import { telefuncAction } from "@/server/telefunc-action";
 type SetupContext = {
   env?: Record<string, unknown> & {
     DB?: D1Database;
+    ADMIN_PATH?: string;
   };
 };
 
@@ -18,6 +19,7 @@ type SetupInput = {
   name: string;
   email: string;
   password: string;
+  setupToken: string;
 };
 
 
@@ -38,6 +40,7 @@ function validateAccountInput(input: SetupInput) {
 async function internalOnSetupRoot(input: SetupInput) {
   const context = getContext<SetupContext>();
   if (!context.env?.DB) appError("DATABASE_UNAVAILABLE");
+  if (!context.env.ADMIN_PATH || input.setupToken !== context.env.ADMIN_PATH) appError("ROOT_SETUP_NOT_FOUND");
 
   const runtime = { runtime: "workerd", env: context.env } as unknown as RuntimeAdapter;
   if (await hasRoot(runtime)) appError("ROOT_SETUP_NOT_FOUND");

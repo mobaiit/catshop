@@ -51,6 +51,7 @@ import { toTypedSchema } from "@vee-validate/zod";
 import { Field as VeeField, useForm } from "vee-validate";
 import { ref } from "vue";
 import { z } from "zod";
+import { usePageContext } from "vike-vue/usePageContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -59,6 +60,8 @@ import { runTelefunc } from "@/lib/telefunc-client";
 import { onSetupRoot } from "@/server/setup.telefunc";
 
 const initialized = ref(false);
+const pageContext = usePageContext();
+const setupToken = typeof pageContext.urlParsed.search.token === "string" ? pageContext.urlParsed.search.token : "";
 
 const schema = z.object({
 
@@ -78,7 +81,7 @@ const { handleSubmit, isSubmitting } = useForm({
 
 const submit = handleSubmit(async ({ confirmPassword: _confirmPassword, ...input }) => {
   try {
-    await runTelefunc(() => onSetupRoot(input), { successMessage: "网站初始化完成。" });
+    await runTelefunc(() => onSetupRoot({ ...input, setupToken }), { successMessage: "网站初始化完成。" });
     initialized.value = true;
   } catch {
     // runTelefunc 已显示脱敏错误。
