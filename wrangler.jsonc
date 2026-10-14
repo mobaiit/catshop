@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "catshop",
+  "workers_dev": true,
   "compatibility_date": "2026-03-12",
   "main": "vike:server-entry",
   "send_email": [
@@ -23,12 +24,6 @@
   "triggers": {
     "crons": ["* * * * *"]
   },
-  "routes": [
-    {
-      "pattern": "catshop.us.ci",
-      "custom_domain": true
-    }
-  ],
   "observability": {
 		"enabled": true,
 		"head_sampling_rate": 0.1
