@@ -31,7 +31,7 @@ function insertFixtures(sqlite: Database, identity: FlowIdentity) {
       .run(identity.ownerUserId, identity.name, identity.email, now, now);
   }
   sqlite.query("INSERT INTO siteSetting (id, siteName, siteUrl, registrationEnabled, timezone, createdAt, updatedAt) VALUES (1, 'Core Shop', 'https://shop.example.com', 1, 'Asia/Shanghai', ?, ?)").run(now, now);
-  sqlite.query("INSERT INTO product_v2 (name, slug, status, sort, createdAt, updatedAt) VALUES ('Core product', ?, 'ACTIVE', 0, ?, ?)")
+  sqlite.query("INSERT INTO product_v2 (name, slug, afterPurchaseNote, status, sort, createdAt, updatedAt) VALUES ('Core product', ?, 'Provider: https://provider.example.com', 'ACTIVE', 0, ?, ?)")
     .run(`core-${identity.ownerUserId ?? "guest"}`, now, now);
   const product = sqlite.query("SELECT id FROM product_v2 WHERE slug = ?").get(`core-${identity.ownerUserId ?? "guest"}`) as { id: number };
   sqlite.query("INSERT INTO productSku (productId, name, price, status, deliveryType, fixedDeliveryContent, minBuy, maxBuy, sort, createdAt, updatedAt) VALUES (?, 'Default', 1000, 'ACTIVE', 'FIXED_CARD', 'LICENSE-CORE-001', 1, 1, 0, ?, ?)")
@@ -64,6 +64,13 @@ async function runStorefrontFlow(identity: FlowIdentity) {
     discountCode,
   }, identity.ownerUserId);
   expect(created).toMatchObject({ amount: 0, originalAmount: 1000, discountAmount: 1000, discountCode });
+  const pending = await getOrderForQuery(context.database, created.orderNo, identity.ownerUserId, identity.ownerUserId ? undefined : identity.email);
+  expect(pending?.afterPurchaseNote).toBeNull();
+  expect(context.sqlite.query("SELECT afterPurchaseNoteSnapshot FROM `order` WHERE id = ?").get(created.id)).toEqual({ afterPurchaseNoteSnapshot: "Provider: https://provider.example.com" });
+  context.sqlite.query("UPDATE `order` SET status = 'PAID', paymentStatus = 'PAID' WHERE id = ?").run(created.id);
+  const paidButUndelivered = await getOrderForQuery(context.database, created.orderNo, identity.ownerUserId, identity.ownerUserId ? undefined : identity.email);
+  expect(paidButUndelivered?.afterPurchaseNote).toBeNull();
+  context.sqlite.query("UPDATE `order` SET status = 'PENDING', paymentStatus = 'UNPAID' WHERE id = ?").run(created.id);
 
   expect(await confirmOrderPayment(context.database, created.id)).toEqual({ outcome: "CONFIRMED" });
   const order = context.sqlite.query("SELECT ownerUserId, status, paymentStatus, deliveryStatus FROM `order` WHERE id = ?").get(created.id);
@@ -100,7 +107,7 @@ describe("core storefront flows", () => {
     const { context, created } = await runStorefrontFlow(identity);
 
     const queried = await getOrderForQuery(context.database, created.orderNo, null, identity.email);
-    expect(queried).toMatchObject({ status: "DELIVERED", paymentStatus: "PAID", deliveries: ["LICENSE-CORE-001"] });
+    expect(queried).toMatchObject({ status: "DELIVERED", paymentStatus: "PAID", deliveries: ["LICENSE-CORE-001"], afterPurchaseNote: "Provider: https://provider.example.com" });
     expect(await getOrderForQuery(context.database, created.orderNo, null, "other@example.com")).toBeNull();
   });
 
@@ -109,7 +116,7 @@ describe("core storefront flows", () => {
     const { context, created } = await runStorefrontFlow(identity);
 
     const queried = await getOrderForQuery(context.database, created.orderNo, identity.ownerUserId);
-    expect(queried).toMatchObject({ status: "DELIVERED", paymentStatus: "PAID", deliveries: ["LICENSE-CORE-001"] });
+    expect(queried).toMatchObject({ status: "DELIVERED", paymentStatus: "PAID", deliveries: ["LICENSE-CORE-001"], afterPurchaseNote: "Provider: https://provider.example.com" });
     expect(await getOrderForQuery(context.database, created.orderNo, "another-user")).toBeNull();
   });
 });

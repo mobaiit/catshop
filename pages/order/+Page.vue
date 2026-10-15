@@ -104,8 +104,7 @@
                 <div><dt class="text-xs text-muted-foreground">发货状态</dt><dd class="mt-1 font-medium">{{ deliveryStatusLabel(result.deliveryStatus) }}</dd></div>
               </dl>
 
-
-
+              <AfterPurchaseNote v-if="result.afterPurchaseNote" :note="result.afterPurchaseNote" />
               <div v-if="result.deliveries.length" class="min-w-0 border-t pt-6">
                 <p class="mb-3 font-medium">发货内容</p>
                 <pre class="max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-md border bg-muted/50 p-4 font-mono text-xs leading-6">{{ result.deliveries.join("\n") }}</pre>
@@ -173,6 +172,7 @@ import { z } from "zod";
 
 import PublicNav from "@/components/storefront/PublicNav.vue";
 import OrderList from "@/components/storefront/OrderList.vue";
+import AfterPurchaseNote from "@/components/storefront/AfterPurchaseNote.vue";
 import StorefrontBrand from "@/components/storefront/StorefrontBrand.vue";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";

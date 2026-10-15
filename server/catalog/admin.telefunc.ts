@@ -208,6 +208,7 @@ async function internalOnSaveProduct(input: {
   description?: string;
   manualDeliveryHint?: string;
   purchaseNote?: string;
+  afterPurchaseNote?: string;
   status: ProductStatus;
   sort: number;
   skus: ProductSkuInput[];
@@ -260,6 +261,7 @@ async function internalOnSaveProduct(input: {
     description: sanitizeProductDescription(requiredText(input.description, "PRODUCT_DESCRIPTION_REQUIRED", 100_000, "PRODUCT_DESCRIPTION_TOO_LONG")) ?? (appError("PRODUCT_DESCRIPTION_REQUIRED"), null),
     manualDeliveryHint: optionalText(input.manualDeliveryHint, 2_000, "PRODUCT_MANUAL_DELIVERY_HINT_INVALID"),
     purchaseNote: optionalText(input.purchaseNote, 2_000, "PRODUCT_PURCHASE_NOTE_INVALID"),
+    afterPurchaseNote: optionalText(input.afterPurchaseNote, 2_000, "PRODUCT_AFTER_PURCHASE_NOTE_INVALID"),
     status: input.status,
     sort: nonNegativeInteger(input.sort, "PRODUCT_SORT_INVALID"),
     updatedAt: new Date(),
@@ -382,6 +384,7 @@ async function internalOnSaveSupplierProductPresentation(input: {
   coverImage?: string;
   description?: string;
   purchaseNote?: string;
+  afterPurchaseNote?: string;
   status: ProductStatus;
   sort: number;
   skus: SupplierPresentationSkuInput[];
@@ -416,7 +419,7 @@ async function internalOnSaveSupplierProductPresentation(input: {
     const status = input.status === "ACTIVE" && boundSkuIds.has(sku.id) ? "ACTIVE" : sku.status;
     await db.update(productSku).set({ name: sku.name, price: sku.price, status, sort: sku.sort, updatedAt: now }).where(and(eq(productSku.id, sku.id), eq(productSku.productId, input.id)));
   }
-  const [saved] = await db.update(productV2).set({ categoryId, name, slug: resolveSlug(input.slug, name), subtitle: optionalText(input.subtitle, 300, "PRODUCT_SUBTITLE_INVALID"), coverImage: resolveCoverImage(input.coverImage), description: sanitizeProductDescription(requiredText(input.description, "PRODUCT_DESCRIPTION_REQUIRED", 100_000, "PRODUCT_DESCRIPTION_TOO_LONG")) ?? (appError("PRODUCT_DESCRIPTION_REQUIRED"), null), purchaseNote: optionalText(input.purchaseNote, 2_000, "PRODUCT_PURCHASE_NOTE_INVALID"), status: input.status, sort: nonNegativeInteger(input.sort, "PRODUCT_SORT_INVALID"), updatedAt: now }).where(eq(productV2.id, input.id)).returning();
+  const [saved] = await db.update(productV2).set({ categoryId, name, slug: resolveSlug(input.slug, name), subtitle: optionalText(input.subtitle, 300, "PRODUCT_SUBTITLE_INVALID"), coverImage: resolveCoverImage(input.coverImage), description: sanitizeProductDescription(requiredText(input.description, "PRODUCT_DESCRIPTION_REQUIRED", 100_000, "PRODUCT_DESCRIPTION_TOO_LONG")) ?? (appError("PRODUCT_DESCRIPTION_REQUIRED"), null), purchaseNote: optionalText(input.purchaseNote, 2_000, "PRODUCT_PURCHASE_NOTE_INVALID"), afterPurchaseNote: optionalText(input.afterPurchaseNote, 2_000, "PRODUCT_AFTER_PURCHASE_NOTE_INVALID"), status: input.status, sort: nonNegativeInteger(input.sort, "PRODUCT_SORT_INVALID"), updatedAt: now }).where(eq(productV2.id, input.id)).returning();
   if (!saved) appError("PRODUCT_NOT_FOUND");
   return saved;
 }

@@ -145,8 +145,8 @@ export async function createOrder(database: D1Database, input: CreateOrderInput,
   const orderNo = generateOrderNo();
   const paymentChannel = normalizePaymentChannel(input.paymentProvider, input.paymentChannel);
   const statements: D1PreparedStatement[] = [
-    database.prepare("INSERT INTO `order` (orderNo, ownerUserId, productId, productSkuId, productNameSnapshot, productSkuNameSnapshot, unitPrice, quantity, amount, contactType, contactValue, contactEmailNormalized, buyerNote, addressSnapshotJson, paymentProvider, paymentChannel, fulfillmentSourceSnapshot, deliveryTypeSnapshot, fixedDeliveryContentSnapshot, physicalStockReserved, discountCodeId, discountCodeStr, originalAmount, discountAmount, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(
-      orderNo, ownerUserId, item.id, sku.id, item.name, sku.name, sku.price, quantity, amount, input.contactType, contactValue,
+    database.prepare("INSERT INTO `order` (orderNo, ownerUserId, productId, productSkuId, productNameSnapshot, productSkuNameSnapshot, afterPurchaseNoteSnapshot, unitPrice, quantity, amount, contactType, contactValue, contactEmailNormalized, buyerNote, addressSnapshotJson, paymentProvider, paymentChannel, fulfillmentSourceSnapshot, deliveryTypeSnapshot, fixedDeliveryContentSnapshot, physicalStockReserved, discountCodeId, discountCodeStr, originalAmount, discountAmount, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(
+      orderNo, ownerUserId, item.id, sku.id, item.name, sku.name, item.afterPurchaseNote?.trim() || null, sku.price, quantity, amount, input.contactType, contactValue,
       input.contactType === "EMAIL" ? normalizeOrderEmail(contactValue) : null, input.buyerNote?.trim() || null,
       addressSnapshotJson, input.paymentProvider, paymentChannel, sku.fulfillmentSource, sku.deliveryType,
       sku.deliveryType === "FIXED_CARD" ? sku.fixedDeliveryContent!.trim() : null, reservePhysical ? 1 : 0,
@@ -355,6 +355,7 @@ export type QueriedOrder = {
   amount: string;
   createdAt: Date;
   deliveries: string[];
+  afterPurchaseNote: string | null;
 };
 
 export async function getOrderForQuery(database: D1Database, orderNo: string, ownerUserId: string | null, email?: string): Promise<QueriedOrder | null> {
@@ -372,7 +373,7 @@ export async function getOrderForQuery(database: D1Database, orderNo: string, ow
       : null;
   if (!access) return null;
   const db = createDrizzleDb(database);
-  const [record] = await db.select({ id: order.id, orderNo: order.orderNo, status: order.status, paymentStatus: order.paymentStatus, deliveryStatus: order.deliveryStatus, paymentProvider: order.paymentProvider, paymentChannel: order.paymentChannel, productName: order.productNameSnapshot, quantity: order.quantity, amount: order.amount, createdAt: order.createdAt }).from(order).where(and(eq(order.orderNo, normalizedOrderNo), access)).limit(1);
+  const [record] = await db.select({ id: order.id, orderNo: order.orderNo, status: order.status, paymentStatus: order.paymentStatus, deliveryStatus: order.deliveryStatus, paymentProvider: order.paymentProvider, paymentChannel: order.paymentChannel, productName: order.productNameSnapshot, quantity: order.quantity, amount: order.amount, createdAt: order.createdAt, afterPurchaseNoteSnapshot: order.afterPurchaseNoteSnapshot }).from(order).where(and(eq(order.orderNo, normalizedOrderNo), access)).limit(1);
   if (!record) return null;
   const deliveries = await db.select({ contentSnapshot: orderDelivery.contentSnapshot }).from(orderDelivery).where(and(eq(orderDelivery.orderId, record.id), eq(orderDelivery.status, "SUCCESS"))).orderBy(asc(orderDelivery.id));
   return {
@@ -386,6 +387,9 @@ export async function getOrderForQuery(database: D1Database, orderNo: string, ow
     quantity: record.quantity,
     amount: formatCentsAsYuan(record.amount),
     createdAt: record.createdAt,
+    afterPurchaseNote: record.paymentStatus === "PAID" && record.deliveryStatus === "DELIVERED"
+      ? record.afterPurchaseNoteSnapshot
+      : null,
     deliveries: deliveries.flatMap((item) => {
       if (!item.contentSnapshot) return [];
       try {

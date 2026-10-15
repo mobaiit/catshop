@@ -18,6 +18,7 @@ export const productFormSchema = z.object({
   description: z.string().trim().min(1, "商品详情不能为空"),
   manualDeliveryHint: z.string(),
   purchaseNote: z.string(),
+  afterPurchaseNote: z.string().max(2_000, "购买后说明不能超过 2000 个字符"),
 
   status: z.enum(productStatuses),
   sort: z.number().int().min(0),
@@ -31,11 +32,11 @@ export function slugifyProductName(value: string) {
 }
 
 export function defaultProductForm(categoryId: number | null = null): ProductForm {
-  return { categoryId: categoryId ?? 0, name: "", slug: "", subtitle: "", coverImage: "", description: "", manualDeliveryHint: "", purchaseNote: "", status: "DRAFT", sort: 0 };
+  return { categoryId: categoryId ?? 0, name: "", slug: "", subtitle: "", coverImage: "", description: "", manualDeliveryHint: "", purchaseNote: "", afterPurchaseNote: "", status: "DRAFT", sort: 0 };
 }
 
 export function productDetailToForm(item: ProductDetail["product"]): ProductForm {
-  return { id: item.id, categoryId: item.categoryId ?? 0, name: item.name, slug: item.slug, subtitle: item.subtitle ?? "", coverImage: item.coverImage ?? "", description: item.description ?? "", manualDeliveryHint: item.manualDeliveryHint ?? "", purchaseNote: item.purchaseNote ?? "", status: item.status, sort: item.sort };
+  return { id: item.id, categoryId: item.categoryId ?? 0, name: item.name, slug: item.slug, subtitle: item.subtitle ?? "", coverImage: item.coverImage ?? "", description: item.description ?? "", manualDeliveryHint: item.manualDeliveryHint ?? "", purchaseNote: item.purchaseNote ?? "", afterPurchaseNote: item.afterPurchaseNote ?? "", status: item.status, sort: item.sort };
 }
 
 export type ProductDeliveryType = (typeof deliveryTypes)[number];
@@ -64,6 +65,7 @@ export function formToSaveInput(form: ProductForm, skus: ProductSkuDraftInput[],
     description: form.description,
     manualDeliveryHint: form.manualDeliveryHint,
     purchaseNote: form.purchaseNote,
+    afterPurchaseNote: form.afterPurchaseNote,
     status: form.status,
     sort: form.sort,
     deliveryType,

@@ -137,6 +137,7 @@ export const productV2 = sqliteTable(
     sort: integer("sort").notNull().default(0),
 
     purchaseNote: text("purchaseNote"),
+    afterPurchaseNote: text("afterPurchaseNote"),
     createdAt,
     updatedAt,
   },
@@ -225,6 +226,7 @@ export const order = sqliteTable(
     productSkuId: integer("productSkuId").references(() => productSku.id, { onDelete: "set null" }),
     productNameSnapshot: text("productNameSnapshot").notNull(),
     productSkuNameSnapshot: text("productSkuNameSnapshot"),
+    afterPurchaseNoteSnapshot: text("afterPurchaseNoteSnapshot"),
     unitPrice: integer("unitPrice").notNull(),
     quantity: integer("quantity").notNull(),
     amount: integer("amount").notNull(),

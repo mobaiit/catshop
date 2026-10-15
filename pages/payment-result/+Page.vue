@@ -20,6 +20,7 @@
           <template v-if="order">
             <div class="flex items-center justify-between gap-4 rounded-md border p-4"><span>订单状态</span><Badge :variant="statusVariant(order.status)">{{ statusLabel(order.status) }}</Badge></div>
             <div class="grid gap-3 border-y py-4"><div class="flex justify-between gap-4"><span class="text-muted-foreground">订单号</span><span class="font-mono text-xs">{{ order.orderNo }}</span></div><div class="flex justify-between gap-4"><span class="text-muted-foreground">金额</span><span>¥{{ order.amount }}</span></div><div class="flex justify-between gap-4"><span class="text-muted-foreground">支付状态</span><span>{{ paymentStatusLabel(order.paymentStatus) }}</span></div><div class="flex justify-between gap-4"><span class="text-muted-foreground">发货状态</span><span>{{ deliveryStatusLabel(order.deliveryStatus) }}</span></div></div>
+            <AfterPurchaseNote v-if="order.afterPurchaseNote" :note="order.afterPurchaseNote" />
             <div v-if="order.deliveries.length"><p class="font-medium">发货内容</p><pre class="overflow-x-auto whitespace-pre-wrap rounded-md border bg-muted/50 p-3 font-mono text-xs leading-6">{{ order.deliveries.join("\n") }}</pre></div>
             <p v-else class="text-muted-foreground">支付通知可能仍在处理中，页面会自动查询订单状态。</p>
           </template>
@@ -38,6 +39,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
 import { useData } from "vike-vue/useData";
 import { usePageContext } from "vike-vue/usePageContext";
+import AfterPurchaseNote from "@/components/storefront/AfterPurchaseNote.vue";
 import PublicNav from "@/components/storefront/PublicNav.vue";
 import StorefrontBrand from "@/components/storefront/StorefrontBrand.vue";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
