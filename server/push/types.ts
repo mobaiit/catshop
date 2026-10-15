@@ -2,6 +2,7 @@ export const pushChannels = ["EMAIL", "WECHAT", "TELEGRAM"] as const;
 export const pushMessageTypes = ["NORMAL", "ADMIN"] as const;
 export const pushScenes = [
   "TEST",
+  "ORDER_CREATED",
   "ORDER_PAID",
   "DELIVERY_SUCCESS",
   "DELIVERY_FAILED",

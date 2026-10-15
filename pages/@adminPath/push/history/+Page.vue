@@ -63,6 +63,7 @@ const sceneOptions: Array<{ value: PushScene; label: string }> = [
   { value: "EMAIL_VERIFICATION", label: "邮箱验证" },
   { value: "PASSWORD_RESET", label: "密码找回" },
   { value: "GUEST_ORDER_RECOVERY", label: "Guest 订单恢复" },
+  { value: "ORDER_CREATED", label: "新订单（待支付）" },
   { value: "ORDER_PAID", label: "支付成功" },
   { value: "DELIVERY_SUCCESS", label: "发货成功" },
   { value: "DELIVERY_FAILED", label: "发货失败" },

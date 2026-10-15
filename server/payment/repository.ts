@@ -19,8 +19,16 @@ export function paymentRepository(database: D1Database) {
       const [record] = await db.insert(paymentAttempt).values({ orderId: input.orderId, provider: input.provider, channel: input.channel ?? null, status: "CREATING", createdAt: now, updatedAt: now }).returning({ id: paymentAttempt.id });
       return record?.id ?? null;
     },
-    async completeAttempt(attemptId: number, paymentOrderNo?: string, expiresAt?: number) {
-      await db.update(paymentAttempt).set({ paymentOrderNo: paymentOrderNo ?? null, expiresAt: expiresAt ? new Date(expiresAt) : null, status: "PENDING", updatedAt: new Date() }).where(and(eq(paymentAttempt.id, attemptId), eq(paymentAttempt.status, "CREATING")));
+    async completeAttempt(attemptId: number, paymentOrderNo?: string, expiresAt?: number, createdOrderId?: number) {
+      const now = Date.now();
+      const statements = [
+        database.prepare("UPDATE paymentAttempt SET paymentOrderNo = ?, expiresAt = ?, status = 'PENDING', updatedAt = ? WHERE id = ? AND status = 'CREATING'")
+          .bind(paymentOrderNo ?? null, expiresAt ?? null, now, attemptId),
+      ];
+      if (createdOrderId !== undefined) {
+        statements.push(database.prepare("INSERT INTO orderEvent (eventKey, orderId, scene, status, attemptCount, availableAt, createdAt, updatedAt) SELECT 'order-created:' || id, id, 'ORDER_CREATED', 'PENDING', 0, ?, ?, ? FROM `order` WHERE id = ? AND amount > 0 AND status = 'PENDING' AND paymentStatus = 'UNPAID' ON CONFLICT(eventKey) DO NOTHING").bind(now, now, now, createdOrderId));
+      }
+      await database.batch(statements);
     },
     async failAttempt(attemptId: number) {
       await db.update(paymentAttempt).set({ status: "FAILED", updatedAt: new Date() }).where(and(eq(paymentAttempt.id, attemptId), or(eq(paymentAttempt.status, "CREATING"), eq(paymentAttempt.status, "PENDING"))));

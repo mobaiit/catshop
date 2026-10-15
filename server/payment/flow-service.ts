@@ -86,7 +86,7 @@ export class PaymentFlowService {
       const urls = resolvePaymentUrls(provider.provider, site.siteUrl, config);
       const adapter = definition.createAdapter(config);
       const result = await adapter.create({ orderNo: created.orderNo, amount: created.amount, subject: `订单 ${created.orderNo}`, channel, notifyUrl: urls.notifyUrl, returnUrl: paymentReturnUrl(urls.returnUrl, created.orderNo) });
-      await repository.completeAttempt(attemptId, result.paymentOrderNo, result.expiresAt);
+      await repository.completeAttempt(attemptId, result.paymentOrderNo, result.expiresAt, created.id);
       await logs.writeBestEffort({ orderId: created.id, provider: provider.provider, orderNo: created.orderNo, paymentOrderNo: result.paymentOrderNo, eventType: "CREATE", verifyStatus: "PENDING", payload: result });
       return { ...created, payment: result };
     } catch (cause) {

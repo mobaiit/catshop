@@ -12,7 +12,7 @@ import { parseThirdPartyProviderConfig } from "@/server/push/third-party-provide
 import { parseTelegramProviderConfig } from "@/server/push/telegram-provider";
 import type { PushScene as PushLogScene } from "./types";
 
-export type PushScene = "ORDER_PAID" | "DELIVERY_SUCCESS" | "DELIVERY_FAILED" | "PAYMENT_EXCEPTION";
+export type PushScene = "ORDER_CREATED" | "ORDER_PAID" | "DELIVERY_SUCCESS" | "DELIVERY_FAILED" | "PAYMENT_EXCEPTION";
 export type PushChannel = "EMAIL" | "WECHAT" | "TELEGRAM";
 export type PushMessageType = "NORMAL" | "ADMIN";
 export type PushStatus = "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "SKIPPED" | "EXHAUSTED";
@@ -23,10 +23,11 @@ type SaveInput = { policies: Policy[] };
 const pushChannels = new Set<PushChannel>(["EMAIL", "WECHAT", "TELEGRAM"]);
 const pushMessageTypes = new Set<PushMessageType>(["NORMAL", "ADMIN"]);
 
-const pushLogScenes = new Set<PushLogScene>(["TEST", "EMAIL_VERIFICATION", "PASSWORD_RESET", "GUEST_ORDER_RECOVERY", "ORDER_PAID", "DELIVERY_SUCCESS", "DELIVERY_FAILED", "PAYMENT_EXCEPTION"]);
+const pushLogScenes = new Set<PushLogScene>(["TEST", "EMAIL_VERIFICATION", "PASSWORD_RESET", "GUEST_ORDER_RECOVERY", "ORDER_CREATED", "ORDER_PAID", "DELIVERY_SUCCESS", "DELIVERY_FAILED", "PAYMENT_EXCEPTION"]);
 const pushStatuses = new Set<PushStatus>(["PENDING", "PROCESSING", "SUCCESS", "FAILED", "SKIPPED", "EXHAUSTED"]);
 
 const defaultPolicies: Policy[] = [
+  { messageType: "ADMIN", scene: "ORDER_CREATED", channels: [], isEnabled: false },
   { messageType: "NORMAL", scene: "ORDER_PAID", channels: ["EMAIL"], isEnabled: true },
   { messageType: "NORMAL", scene: "DELIVERY_SUCCESS", channels: ["EMAIL"], isEnabled: true },
   { messageType: "ADMIN", scene: "ORDER_PAID", channels: [], isEnabled: true },

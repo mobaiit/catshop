@@ -7,6 +7,7 @@ import { parseThirdPartyProviderConfig, sendThirdPartyPush } from "@/server/push
 import { parseTelegramProviderConfig, sendTelegramPush } from "@/server/push/telegram-provider";
 import { buildSmtpMessage, buildSmtpTransport, parseEmailApiSuccessResponse, PUSH_MAX_ATTEMPTS, pushRetryDelayMs, renderPushTemplate, smtpSendError } from "@/lib/push-utils";
 import { sanitizeDatabaseLogText } from "@/server/database-log-sanitizer";
+import { formatDateInTimezone } from "@/lib/site-timezone";
 
 import type { PushChannel, PushDispatchInput, PushDispatchResult, PushRecipient } from "./types";
 
@@ -37,6 +38,7 @@ const defaultPolicyChannels: Partial<Record<PushDispatchInput["messageType"], Pa
     DELIVERY_SUCCESS: ["EMAIL"],
   },
   ADMIN: {
+    ORDER_CREATED: [],
     ORDER_PAID: [],
     DELIVERY_SUCCESS: ["EMAIL"],
     DELIVERY_FAILED: ["EMAIL"],
@@ -58,7 +60,7 @@ function parsePolicyChannels(channelsJson: string): PushChannel[] {
 async function policyChannels(database: D1Database, input: PushDispatchInput): Promise<PushChannel[]> {
   if (input.scene === "TEST" || (input.recipient && directRecipientScenes.has(input.scene))) return ["EMAIL"];
   if (directRecipientScenes.has(input.scene)) return [];
-  const scene = input.scene as "ORDER_PAID" | "DELIVERY_SUCCESS" | "DELIVERY_FAILED" | "PAYMENT_EXCEPTION";
+  const scene = input.scene as "ORDER_CREATED" | "ORDER_PAID" | "DELIVERY_SUCCESS" | "DELIVERY_FAILED" | "PAYMENT_EXCEPTION";
   const [policy] = await createDrizzleDb(database).select({ isEnabled: pushPolicy.isEnabled, channelsJson: pushPolicy.channelsJson }).from(pushPolicy).where(and(eq(pushPolicy.messageType, input.messageType), eq(pushPolicy.scene, scene))).limit(1);
   if (!policy) return [...(defaultPolicyChannels[input.messageType]?.[input.scene] ?? [])];
   return policy.isEnabled ? parsePolicyChannels(policy.channelsJson) : [];
@@ -466,13 +468,23 @@ export function orderQueryUrl(siteUrl: string | null | undefined, orderNo: strin
   return `${base}${path}?${query.toString()}`;
 }
 
+function paymentMethodLabel(provider: string, channel: string | null) {
+  const channelLabel = channel === "wechat" || channel === "wxpay" ? "微信" : channel === "alipay" || channel === "face_to_face" ? "支付宝" : channel;
+  const providerLabel = provider === "OWNPAY" ? "OwnPay" : provider;
+  return channelLabel ? `${providerLabel} · ${channelLabel}` : providerLabel;
+}
+
+function contactTypeLabel(value: string) {
+  return ({ EMAIL: "邮箱", QQ: "QQ", TELEGRAM: "Telegram", OTHER: "其他" } as Record<string, string>)[value] ?? value;
+}
+
 export async function orderPushVariables(database: D1Database, orderId: number) {
   const db = createDrizzleDb(database);
   const [[record], [settings], deliveries] = await Promise.all([
-    db.select({ orderNo: order.orderNo, ownerUserId: order.ownerUserId, contactEmail: order.contactValue, productName: order.productNameSnapshot, quantity: order.quantity, amount: order.amount, buyerNote: order.buyerNote }).from(order).where(eq(order.id, orderId)).limit(1),
-    db.select({ siteName: siteSetting.siteName, siteUrl: siteSetting.siteUrl, footerText: siteSetting.footerText, supportContact: siteSetting.supportContact }).from(siteSetting).where(eq(siteSetting.id, 1)).limit(1),
+    db.select({ orderNo: order.orderNo, ownerUserId: order.ownerUserId, contactType: order.contactType, contactValue: order.contactValue, productName: order.productNameSnapshot, productSkuName: order.productSkuNameSnapshot, quantity: order.quantity, amount: order.amount, buyerNote: order.buyerNote, paymentProvider: order.paymentProvider, paymentChannel: order.paymentChannel, createdAt: order.createdAt }).from(order).where(eq(order.id, orderId)).limit(1),
+    db.select({ siteName: siteSetting.siteName, siteUrl: siteSetting.siteUrl, footerText: siteSetting.footerText, supportContact: siteSetting.supportContact, timezone: siteSetting.timezone }).from(siteSetting).where(eq(siteSetting.id, 1)).limit(1),
     db.select({ contentSnapshot: orderDelivery.contentSnapshot }).from(orderDelivery).where(and(eq(orderDelivery.orderId, orderId), eq(orderDelivery.status, "SUCCESS"))),
   ]);
   if (!record) return null;
-  return { siteName: settings?.siteName || "CFFK", orderNo: record.orderNo, contactEmail: record.contactEmail || "未提供", productName: record.productName, quantity: record.quantity, amount: new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY" }).format(record.amount / 100), buyerNote: record.buyerNote || "无", deliveryItems: deliveryItemsFromSnapshots(deliveries.flatMap((item) => item.contentSnapshot ? [item.contentSnapshot] : [])), queryUrl: orderQueryUrl(settings?.siteUrl, record.orderNo, record.ownerUserId), footerText: settings?.footerText || "", supportContact: settings?.supportContact || "" };
+  return { siteName: settings?.siteName || "CFFK", orderNo: record.orderNo, contactEmail: record.contactValue || "未提供", contactType: contactTypeLabel(record.contactType), contactValue: record.contactValue || "未提供", productName: record.productName, productSkuName: record.productSkuName || "默认规格", quantity: record.quantity, amount: new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY" }).format(record.amount / 100), paymentMethod: paymentMethodLabel(record.paymentProvider, record.paymentChannel), createdAt: formatDateInTimezone(record.createdAt, settings?.timezone || "Asia/Shanghai", { dateStyle: "medium", timeStyle: "medium" }), buyerNote: record.buyerNote || "无", deliveryItems: deliveryItemsFromSnapshots(deliveries.flatMap((item) => item.contentSnapshot ? [item.contentSnapshot] : [])), queryUrl: orderQueryUrl(settings?.siteUrl, record.orderNo, record.ownerUserId), footerText: settings?.footerText || "", supportContact: settings?.supportContact || "" };
 }

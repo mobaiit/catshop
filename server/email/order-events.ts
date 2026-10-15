@@ -5,7 +5,7 @@ import { dispatchPush, orderPushVariables } from "@/server/push/service";
 import { pushDispatchHandled } from "@/server/push/types";
 
 type EmailRuntime = Record<string, unknown>;
-type OrderScene = "ORDER_PAID" | "DELIVERY_SUCCESS" | "DELIVERY_FAILED" | "PAYMENT_EXCEPTION";
+type OrderScene = "ORDER_CREATED" | "ORDER_PAID" | "DELIVERY_SUCCESS" | "DELIVERY_FAILED" | "PAYMENT_EXCEPTION";
 const EVENT_LEASE_MS = 5 * 60 * 1000;
 
 export async function enqueueOrderEvent(database: D1Database, input: { eventKey: string; orderId: number; scene: OrderScene; errorMessage?: string }) {
@@ -29,6 +29,9 @@ async function dispatchEvent(database: D1Database, runtime: EmailRuntime, event:
   if (!variables) throw new Error("ORDER_PUSH_VARIABLES_UNAVAILABLE");
   const payload = { ...variables, ...(event.errorMessage ? { errorMessage: event.errorMessage } : {}) };
   const source = `order-event:${event.id}`;
+  if (event.scene === "ORDER_CREATED") {
+    return dispatchPush(database, runtime, { scene: event.scene, messageType: "ADMIN", orderId: event.orderId, variables: payload, source });
+  }
   if (event.scene === "DELIVERY_FAILED" || event.scene === "PAYMENT_EXCEPTION") {
     return dispatchPush(database, runtime, { scene: event.scene, messageType: "ADMIN", orderId: event.orderId, variables: payload, source });
   }
