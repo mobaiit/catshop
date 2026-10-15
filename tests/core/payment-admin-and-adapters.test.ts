@@ -704,6 +704,26 @@ test("OwnPay creates a signed order and returns its image QR and exact expiry", 
   } finally { globalThis.fetch = originalFetch; }
 });
 
+test("OwnPay retries an expired or cancelled payment through the dedicated signed endpoint", async () => {
+  const originalFetch = globalThis.fetch;
+  let captured: Request | null = null;
+  globalThis.fetch = async (input, init) => {
+    captured = new Request(input, init);
+    return Response.json({ code: "OK", data: { order_no: "op_2", out_trade_no: "CAT-1", attempt_no: 2, status: "pending", original_amount: 500, actual_amount: 502, qr_url: "https://pay.example/q/b/hash", expires_at: 1_800_000_100_000 } });
+  };
+  try {
+    const adapter = createProviderAdapter("OWNPAY", ownpayConfig);
+    assert.ok(adapter.retry);
+    const result = await adapter.retry({ orderNo: "CAT-1", amount: 500, subject: "订单 CAT-1", channel: "wechat", notifyUrl: ownpayConfig.notifyUrl, returnUrl: "https://catshop.us.ci/payment-result?orderNo=CAT-1" });
+    assert.deepEqual(result, { mode: "qr", qrImageUrl: "https://pay.example/q/b/hash", paymentOrderNo: "op_2", payableAmount: 502, expiresAt: 1_800_000_100_000 });
+    assert.ok(captured);
+    const request = captured as Request;
+    assert.equal(new URL(request.url).pathname, "/api/v1/orders/CAT-1/retry");
+    assert.equal(await request.text(), "{}");
+    assert.ok(request.headers.get("X-OwnPay-Signature"));
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("OwnPay verifies automatic and manual paid callbacks against original amount", async () => {
   const adapter = createProviderAdapter("OWNPAY", ownpayConfig);
   for (const [eventType, status] of [["order.paid", "paid"], ["order.paid_manual_match", "paid_manual"]]) {

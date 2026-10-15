@@ -311,7 +311,7 @@ export const paymentAttempt = sqliteTable(
     channel: text("channel"),
     paymentOrderNo: text("paymentOrderNo"),
     expiresAt: integer("expiresAt", { mode: "timestamp_ms" }),
-    status: text("status", { enum: ["CREATING", "PENDING", "PAID", "FAILED"] }).notNull().default("CREATING"),
+    status: text("status", { enum: ["CREATING", "PENDING", "EXPIRED", "PAID", "FAILED"] }).notNull().default("CREATING"),
     createdAt,
     updatedAt,
   },

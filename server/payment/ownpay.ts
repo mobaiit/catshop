@@ -1,5 +1,5 @@
 import { parseOwnpayConfig } from "@/lib/config-schemas";
-import type { PaymentAdapter, PaymentNotifyResult } from "./types";
+import type { PaymentAdapter, PaymentNotifyResult, PaymentResult } from "./types";
 
 type OwnpayEnvelope = {
   code?: string;
@@ -82,6 +82,20 @@ export function createOwnpayAdapter(configValue: Record<string, unknown>): Payme
     };
   }
 
+  function paymentResult(data: Record<string, unknown>): PaymentResult {
+    if (typeof data.qr_url !== "string" || typeof data.order_no !== "string" || !integer(data.expires_at)) throw new Error("OWNPAY_INVALID_RESPONSE");
+    let qrUrl: URL;
+    try { qrUrl = new URL(data.qr_url); } catch { throw new Error("OWNPAY_INVALID_RESPONSE"); }
+    if (qrUrl.origin !== new URL(config.baseUrl).origin || integer(data.expires_at)! <= Date.now()) throw new Error("OWNPAY_INVALID_RESPONSE");
+    return {
+      mode: "qr",
+      qrImageUrl: qrUrl.toString(),
+      paymentOrderNo: data.order_no,
+      payableAmount: integer(data.actual_amount),
+      expiresAt: integer(data.expires_at),
+    };
+  }
+
   return {
     async create(input) {
       const channel = input.channel === "alipay" ? "alipay" : "wechat";
@@ -93,18 +107,11 @@ export function createOwnpayAdapter(configValue: Record<string, unknown>): Payme
         attach: { source: "catshop" },
         return_url: input.returnUrl,
       }));
-      const data = envelope.data!;
-      if (typeof data.qr_url !== "string" || typeof data.order_no !== "string" || !integer(data.expires_at)) throw new Error("OWNPAY_INVALID_RESPONSE");
-      let qrUrl: URL;
-      try { qrUrl = new URL(data.qr_url); } catch { throw new Error("OWNPAY_INVALID_RESPONSE"); }
-      if (qrUrl.origin !== new URL(config.baseUrl).origin || integer(data.expires_at)! <= Date.now()) throw new Error("OWNPAY_INVALID_RESPONSE");
-      return {
-        mode: "qr",
-        qrImageUrl: qrUrl.toString(),
-        paymentOrderNo: data.order_no,
-        payableAmount: integer(data.actual_amount),
-        expiresAt: integer(data.expires_at),
-      };
+      return paymentResult(envelope.data!);
+    },
+    async retry(input) {
+      const envelope = await parseResponse(await request("POST", `/api/v1/orders/${encodeURIComponent(input.orderNo)}/retry`, {}));
+      return paymentResult(envelope.data!);
     },
     async verify(input) {
       const timestamp = input.headers?.get("X-OwnPay-Timestamp") ?? "";

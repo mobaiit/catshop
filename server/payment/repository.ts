@@ -25,8 +25,15 @@ export function paymentRepository(database: D1Database) {
     async failAttempt(attemptId: number) {
       await db.update(paymentAttempt).set({ status: "FAILED", updatedAt: new Date() }).where(and(eq(paymentAttempt.id, attemptId), or(eq(paymentAttempt.status, "CREATING"), eq(paymentAttempt.status, "PENDING"))));
     },
+    async expireAttempt(attemptId: number, now = new Date()) {
+      const result = await db.update(paymentAttempt).set({ status: "EXPIRED", updatedAt: now }).where(and(eq(paymentAttempt.id, attemptId), eq(paymentAttempt.status, "PENDING")));
+      return result.meta.changes === 1;
+    },
     async findMatchingAttempt(orderId: number, provider: string, paymentOrderNo?: string) {
-      const conditions = [eq(paymentAttempt.orderId, orderId), eq(paymentAttempt.provider, provider), or(eq(paymentAttempt.status, "PENDING"), eq(paymentAttempt.status, "PAID"))];
+      const payableStatuses = provider === "OWNPAY"
+        ? or(eq(paymentAttempt.status, "PENDING"), eq(paymentAttempt.status, "EXPIRED"), eq(paymentAttempt.status, "PAID"))
+        : or(eq(paymentAttempt.status, "PENDING"), eq(paymentAttempt.status, "PAID"));
+      const conditions = [eq(paymentAttempt.orderId, orderId), eq(paymentAttempt.provider, provider), payableStatuses];
       // Alipay and Epay return their platform trade number in callbacks, while
       // creation records the merchant order number. Their signed merchant
       // order number, provider and amount are verified by the callback flow.
@@ -47,7 +54,7 @@ export function paymentRepository(database: D1Database) {
       return record ?? null;
     },
     async markAttemptPaid(attemptId: number) {
-      await db.update(paymentAttempt).set({ status: "PAID", updatedAt: new Date() }).where(and(eq(paymentAttempt.id, attemptId), eq(paymentAttempt.status, "PENDING")));
+      await db.update(paymentAttempt).set({ status: "PAID", updatedAt: new Date() }).where(and(eq(paymentAttempt.id, attemptId), or(eq(paymentAttempt.status, "PENDING"), eq(paymentAttempt.status, "EXPIRED"))));
     },
     async updatePaymentStatus(orderId: number, paymentStatus: "UNPAID" | "PAID" | "FAILED") {
       await db.update(order).set({ paymentStatus, updatedAt: new Date() }).where(eq(order.id, orderId));
