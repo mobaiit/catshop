@@ -130,9 +130,7 @@ export class PaymentFlowService {
       const config = JSON.parse(provider.configJson) as Record<string, unknown>;
       const site = await getSiteSettings(this.database);
       const urls = resolvePaymentUrls(provider.provider, site.siteUrl, config);
-      const adapter = definition.createAdapter(config);
-      const paymentInput = { orderNo: record.orderNo, amount: record.amount, subject: `订单 ${record.orderNo}`, channel: record.paymentChannel as PaymentChannel | undefined, notifyUrl: urls.notifyUrl, returnUrl: paymentReturnUrl(urls.returnUrl, record.orderNo) };
-      const payment = adapter.retry ? await adapter.retry(paymentInput) : await adapter.create(paymentInput);
+      const payment = await definition.createAdapter(config).create({ orderNo: record.orderNo, amount: record.amount, subject: `订单 ${record.orderNo}`, channel: record.paymentChannel as PaymentChannel | undefined, notifyUrl: urls.notifyUrl, returnUrl: paymentReturnUrl(urls.returnUrl, record.orderNo) });
       await repository.completeAttempt(attemptId, payment.paymentOrderNo, payment.expiresAt);
       await new PaymentLogService(this.database).writeBestEffort({ orderId: record.id, provider: provider.provider, orderNo: record.orderNo, paymentOrderNo: payment.paymentOrderNo, eventType: "RESUME", verifyStatus: "PENDING", payload: payment });
       return { orderNo: record.orderNo, amount: record.amount, paymentStatus: "UNPAID", payment };
@@ -240,24 +238,28 @@ export function requirePaymentFlowService() {
   return new PaymentFlowService(context.env.DB, context.env);
 }
 
-export async function closeExpiredOwnpayOrders(database: D1Database, _runtime: Record<string, unknown>, now = new Date(), limit = 100) {
+export async function closeExpiredOwnpayOrders(database: D1Database, runtime: Record<string, unknown>, now = new Date(), limit = 100) {
   const rows = await database.prepare(
-    `SELECT pa.id
+    `SELECT o.id, o.orderNo
      FROM paymentAttempt pa
      JOIN \`order\` o ON o.id = pa.orderId
      WHERE pa.provider = 'OWNPAY' AND pa.status = 'PENDING' AND pa.expiresAt IS NOT NULL AND pa.expiresAt <= ?
        AND o.status = 'PENDING' AND o.paymentStatus = 'UNPAID'
      ORDER BY pa.expiresAt ASC LIMIT ?`,
-  ).bind(now.getTime(), limit).all<{ id: number }>();
+  ).bind(now.getTime(), limit).all<{ id: number; orderNo: string }>();
   let closed = 0;
+  let paid = 0;
   let failed = 0;
+  const service = new PaymentFlowService(database, runtime);
   for (const row of rows.results) {
     try {
-      if (await paymentRepository(database).expireAttempt(row.id, now)) closed += 1;
+      const result = await service.cancelPending(row.id, row.orderNo);
+      if (result.cancelled) closed += 1;
+      if (result.paid) paid += 1;
     } catch (cause) {
       failed += 1;
-      reportUnexpectedServerError("ownpay-expired-attempt-close", cause, { paymentAttemptId: row.id });
+      reportUnexpectedServerError("ownpay-expired-order-close", cause, { orderId: row.id, orderNo: row.orderNo });
     }
   }
-  return { scanned: rows.results.length, closed, paid: 0, failed };
+  return { scanned: rows.results.length, closed, paid, failed };
 }

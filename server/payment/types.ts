@@ -64,7 +64,6 @@ export type PaymentNotifyResult = {
 
 export type PaymentAdapter = {
   create(input: { orderNo: string; amount: number; subject: string; notifyUrl: string; returnUrl: string; channel?: PaymentChannel }): Promise<PaymentResult>;
-  retry?(input: { orderNo: string; amount: number; subject: string; notifyUrl: string; returnUrl: string; channel?: PaymentChannel }): Promise<PaymentResult>;
   verify(input: { payload: Record<string, string>; rawBody?: string; rawBodyBytes?: Uint8Array; headers?: Headers }): Promise<PaymentNotifyResult>;
   query?(input: { orderNo: string; paymentOrderNo?: string; amount: number }): Promise<PaymentQueryResult>;
   cancel?(input: { orderNo: string; paymentOrderNo?: string }): Promise<{ status: "CANCELLED" | "PAID" | "FAILED"; message: string }>;
