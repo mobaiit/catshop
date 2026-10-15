@@ -7,6 +7,7 @@ import { category, order, productSku, productV2, supplierAccount, supplierBindin
 import { importSupplierProduct } from "../../server/supplier/import";
 import { assertSupplierSkuPublishable } from "../../server/supplier/eligibility";
 import { getPublicProductDetail } from "../../server/catalog/public";
+import { resolveSupplierPresentationSkuStatuses } from "../../server/catalog/supplier-presentation";
 import { createOrder } from "../../server/order/service";
 import { createTestDatabase } from "../helpers/sqlite-d1";
 
@@ -53,6 +54,48 @@ function mockSupplierPublicationRefresh(balance: string, stock: number) {
 }
 
 describe("supplier import", () => {
+  test("preserves admin SKU status choices after a supplier product is active", () => {
+    const resolved = resolveSupplierPresentationSkuStatuses({
+      productWasActive: true,
+      productWillBeActive: true,
+      skus: [{ id: 1, status: "INACTIVE" }, { id: 2, status: "ACTIVE" }],
+      enabledBindingSkuIds: new Set([1, 2]),
+    });
+
+    expect([...resolved.statusBySkuId]).toEqual([[1, "INACTIVE"], [2, "ACTIVE"]]);
+    expect(resolved.activeSkuIds).toEqual([2]);
+  });
+
+  test("only auto-enables bound defaults on initial supplier publication", () => {
+    const initial = resolveSupplierPresentationSkuStatuses({
+      productWasActive: false,
+      productWillBeActive: true,
+      skus: [{ id: 1, status: "INACTIVE" }, { id: 2, status: "INACTIVE" }],
+      enabledBindingSkuIds: new Set([1, 2]),
+    });
+    const alreadyActive = resolveSupplierPresentationSkuStatuses({
+      productWasActive: true,
+      productWillBeActive: true,
+      skus: [{ id: 1, status: "INACTIVE" }, { id: 2, status: "INACTIVE" }],
+      enabledBindingSkuIds: new Set([1, 2]),
+    });
+
+    expect(initial.activeSkuIds).toEqual([1, 2]);
+    expect(alreadyActive.activeSkuIds).toEqual([]);
+  });
+
+  test("keeps an unbound supplier SKU inactive", () => {
+    const resolved = resolveSupplierPresentationSkuStatuses({
+      productWasActive: true,
+      productWillBeActive: true,
+      skus: [{ id: 1, status: "ACTIVE" }],
+      enabledBindingSkuIds: new Set(),
+    });
+
+    expect(resolved.statusBySkuId.get(1)).toBe("INACTIVE");
+    expect(resolved.activeSkuIds).toEqual([]);
+  });
+
   test("imports supplier SKUs as a draft with explicit fulfillment", async () => {
     const { database, close } = createTestDatabase();
     try {

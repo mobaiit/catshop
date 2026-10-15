@@ -5,6 +5,7 @@ import { appError } from "@/lib/app-error";
 import { slugify } from "@/lib/slugify";
 import { formatCentsAsYuan, parseAmountToCents } from "@/lib/payment-utils";
 import { sanitizeProductDescription } from "./product-description";
+import { resolveSupplierPresentationSkuStatuses } from "./supplier-presentation";
 import { card, category, order, productV2, productSku, supplierBinding } from "@/database/drizzle/schema";
 import { assertSupplierSkuPublishable } from "@/server/supplier/eligibility";
 
@@ -392,7 +393,7 @@ async function internalOnSaveSupplierProductPresentation(input: {
   const { db } = getAdminDb();
   if (!input || typeof input !== "object" || !Number.isInteger(input.id) || input.id < 1) appError("PRODUCT_ID_INVALID");
   if (!productStatusSet.has(input.status) || !Array.isArray(input.skus) || !input.skus.length) appError("PRODUCT_INPUT_INVALID");
-  const [current] = await db.select({ id: productV2.id }).from(productV2).where(eq(productV2.id, input.id)).limit(1);
+  const [current] = await db.select({ id: productV2.id, status: productV2.status }).from(productV2).where(eq(productV2.id, input.id)).limit(1);
   if (!current) appError("PRODUCT_NOT_FOUND");
   const currentSkus = await db.select({ id: productSku.id, fulfillmentSource: productSku.fulfillmentSource, deliveryType: productSku.deliveryType }).from(productSku).where(eq(productSku.productId, input.id));
   if (!currentSkus.length || currentSkus.some((sku) => sku.fulfillmentSource !== "SUPPLIER" || sku.deliveryType !== "SUPPLIER")) appError("SUPPLIER_SKU_EDIT_REJECTED");
@@ -408,15 +409,19 @@ async function internalOnSaveSupplierProductPresentation(input: {
   const now = new Date();
   const enabledBindingRows = await db.select({ productSkuId: supplierBinding.productSkuId }).from(supplierBinding).where(and(inArray(supplierBinding.productSkuId, currentSkus.map((sku) => sku.id)), eq(supplierBinding.enabled, true)));
   const boundSkuIds = new Set(enabledBindingRows.map((row) => row.productSkuId));
+  const resolvedStatuses = resolveSupplierPresentationSkuStatuses({
+    productWasActive: current.status === "ACTIVE",
+    productWillBeActive: input.status === "ACTIVE",
+    skus: normalizedSkus,
+    enabledBindingSkuIds: boundSkuIds,
+  });
   if (input.status === "ACTIVE") {
-    // Older supplier imports created their bound SKUs as INACTIVE. A valid
-    // enabled binding is the source of truth when publishing such products.
-    const activeSkus = normalizedSkus.filter((sku) => boundSkuIds.has(sku.id));
+    const activeSkus = normalizedSkus.filter((sku) => resolvedStatuses.activeSkuIds.includes(sku.id));
     if (!activeSkus.length) appError("PRODUCT_PUBLISH_REJECTED");
     for (const sku of activeSkus) await assertSupplierSkuPublishable(db, sku.id);
   }
   for (const sku of normalizedSkus) {
-    const status = input.status === "ACTIVE" && boundSkuIds.has(sku.id) ? "ACTIVE" : sku.status;
+    const status = resolvedStatuses.statusBySkuId.get(sku.id) ?? "INACTIVE";
     await db.update(productSku).set({ name: sku.name, price: sku.price, status, sort: sku.sort, updatedAt: now }).where(and(eq(productSku.id, sku.id), eq(productSku.productId, input.id)));
   }
   const [saved] = await db.update(productV2).set({ categoryId, name, slug: resolveSlug(input.slug, name), subtitle: optionalText(input.subtitle, 300, "PRODUCT_SUBTITLE_INVALID"), coverImage: resolveCoverImage(input.coverImage), description: sanitizeProductDescription(requiredText(input.description, "PRODUCT_DESCRIPTION_REQUIRED", 100_000, "PRODUCT_DESCRIPTION_TOO_LONG")) ?? (appError("PRODUCT_DESCRIPTION_REQUIRED"), null), purchaseNote: optionalText(input.purchaseNote, 2_000, "PRODUCT_PURCHASE_NOTE_INVALID"), afterPurchaseNote: optionalText(input.afterPurchaseNote, 2_000, "PRODUCT_AFTER_PURCHASE_NOTE_INVALID"), status: input.status, sort: nonNegativeInteger(input.sort, "PRODUCT_SORT_INVALID"), updatedAt: now }).where(eq(productV2.id, input.id)).returning();
