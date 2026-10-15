@@ -20,7 +20,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { usePageContext } from "vike-vue/usePageContext";
-import defaultLogoUrl from "@/assets/logo.svg?url";
+import defaultFaviconUrl from "@/assets/catshop-favicon.png?url";
+import defaultLogoUrl from "@/assets/catshop-logo.png?url";
 
 type Site = { name?: string; subtitle?: string | null; siteUrl?: string | null; logo?: string | null; logoIcon?: string | null };
 type ProductData = { name?: string; subtitle?: string | null; description?: string | null; coverImage?: string | null };
@@ -32,7 +33,7 @@ const isPrivatePage = computed(() => {
   return Boolean(pageContext.routeParams?.adminPath) || pathname === "/setup" || pathname === "/order" || pathname === "/checkout" || pathname === "/payment-result" || pathname.startsWith("/_error");
 });
 const siteUrl = computed(() => normalizeOrigin(pageContext.site?.siteUrl) || normalizeOrigin(pageContext.urlParsed?.origin));
-const iconUrl = computed(() => pageContext.site?.logoIcon || pageContext.site?.logo || defaultLogoUrl);
+const iconUrl = computed(() => pageContext.site?.logoIcon || pageContext.site?.logo || defaultFaviconUrl);
 const seo = computed(() => {
   const siteName = pageContext.site?.name || "喵小铺";
   const product = pageContext.data;

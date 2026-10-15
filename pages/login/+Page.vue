@@ -59,7 +59,7 @@ import { Input } from "@/components/ui/input";
 import StorefrontPreferences from "@/components/storefront/StorefrontPreferences.vue";
 import { authClient } from "@/lib/auth-client";
 import { useStorefrontPreferences } from "@/lib/storefront-preferences";
-import logoUrl from "@/assets/logo.svg?url";
+import logoUrl from "@/assets/catshop-logo.png?url";
 
 type Site = { name?: string | null; logo?: string | null };
 const pageContext = usePageContext() as ReturnType<typeof usePageContext> & { site?: Site | null };

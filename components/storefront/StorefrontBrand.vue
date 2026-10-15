@@ -9,7 +9,7 @@
 import { computed } from "vue";
 import { usePageContext } from "vike-vue/usePageContext";
 
-import logoUrl from "@/assets/logo.svg?url";
+import logoUrl from "@/assets/catshop-logo.png?url";
 
 type Site = { name?: string | null; logo?: string | null };
 type PageContext = ReturnType<typeof usePageContext> & { site?: Site | null };

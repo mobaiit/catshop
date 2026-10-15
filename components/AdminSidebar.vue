@@ -24,7 +24,7 @@
                   <span class="ml-auto text-xs text-muted-foreground">{{ updateStatus }}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem as-child>
-                  <a href="https://github.com/34892002/cffk" target="_blank" rel="noopener noreferrer">
+                  <a href="https://github.com/mobaiit/catshop" target="_blank" rel="noopener noreferrer">
                     <ExternalLinkIcon data-icon="inline-start" />
                     GitHub 仓库
                   </a>
@@ -179,8 +179,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/auth-client";
 import { adminNavigation, adminPages, isAdminNavigationItemActive, type AdminNavigationGroup, type AdminNavigationItem } from "@/lib/admin-navigation";
+import { runTelefunc } from "@/lib/telefunc-client";
+import { onCheckRepositoryVersion } from "@/server/repository-version.admin.telefunc";
 import { BellIcon, ChevronRightIcon, ChevronUpIcon, ChevronsUpDownIcon, ClipboardListIcon, ExternalLinkIcon, InfoIcon, KeyRoundIcon, LayoutDashboardIcon, LogOutIcon, PackageIcon, SettingsIcon, UserRoundCogIcon, UsersIcon } from "@lucide/vue";
-import logoUrl from "@/assets/logo.svg?url";
+import logoUrl from "@/assets/catshop-logo.png?url";
 import { navigate } from "vike/client/router";
 import { computed, ref } from "vue";
 import { usePageContext } from "vike-vue/usePageContext";
@@ -207,9 +209,7 @@ async function checkUpdate() {
   lastCheckTime.value = now;
   updateStatus.value = "检查中...";
   try {
-    const response = await fetch("https://raw.githubusercontent.com/34892002/cffk/main/package.json");
-    const packageInfo = await response.json() as { version?: string };
-    if (!response.ok || !packageInfo.version) throw new Error("invalid response");
+    const packageInfo = await runTelefunc(() => onCheckRepositoryVersion(), { notifyError: false });
     updateStatus.value = compareVersions(appVersion, packageInfo.version) >= 0 ? "已是最新" : `最新 v${packageInfo.version}`;
   } catch {
     updateStatus.value = "检查失败";

@@ -88,7 +88,7 @@
 <script lang="ts" setup>
 import { computed, ref } from "vue";
 import { InfoIcon, PackageOpenIcon, SearchIcon } from "@lucide/vue";
-import logoUrl from "@/assets/logo.svg?url";
+import logoUrl from "@/assets/catshop-logo.png?url";
 import defaultProductImage from "@/assets/product_img.jpg?url";
 import { useData } from "vike-vue/useData";
 import { usePageContext } from "vike-vue/usePageContext";
