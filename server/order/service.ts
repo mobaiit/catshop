@@ -12,6 +12,7 @@ import { allocateCardsForPaidOrder, countAvailableCards } from "@/server/invento
 import { validateAddressId, validateAddressInput } from "@/server/address/validation";
 import { generateOrderNo } from "@/server/order/order-number";
 import { PaymentLogService } from "@/server/payment/log-service";
+import { paymentRepository } from "@/server/payment/repository";
 import type { AddressSnapshot, PaymentAddressInput } from "@/server/payment/types";
 import type { PaymentProviderKind } from "@/server/payment/registry";
 import { createSupplierOrder } from "@/server/supplier/purchase";
@@ -354,6 +355,7 @@ export type QueriedOrder = {
   quantity: number;
   amount: string;
   createdAt: Date;
+  paymentExpiresAt: number | null;
   deliveries: string[];
   afterPurchaseNote: string | null;
 };
@@ -375,6 +377,7 @@ export async function getOrderForQuery(database: D1Database, orderNo: string, ow
   const db = createDrizzleDb(database);
   const [record] = await db.select({ id: order.id, orderNo: order.orderNo, status: order.status, paymentStatus: order.paymentStatus, deliveryStatus: order.deliveryStatus, paymentProvider: order.paymentProvider, paymentChannel: order.paymentChannel, productName: order.productNameSnapshot, quantity: order.quantity, amount: order.amount, createdAt: order.createdAt, afterPurchaseNoteSnapshot: order.afterPurchaseNoteSnapshot }).from(order).where(and(eq(order.orderNo, normalizedOrderNo), access)).limit(1);
   if (!record) return null;
+  const latestPaymentAttempt = await paymentRepository(database).latestAttempt(record.id);
   const deliveries = await db.select({ contentSnapshot: orderDelivery.contentSnapshot }).from(orderDelivery).where(and(eq(orderDelivery.orderId, record.id), eq(orderDelivery.status, "SUCCESS"))).orderBy(asc(orderDelivery.id));
   return {
     orderNo: record.orderNo,
@@ -387,6 +390,7 @@ export async function getOrderForQuery(database: D1Database, orderNo: string, ow
     quantity: record.quantity,
     amount: formatCentsAsYuan(record.amount),
     createdAt: record.createdAt,
+    paymentExpiresAt: latestPaymentAttempt?.expiresAt?.getTime() ?? null,
     afterPurchaseNote: record.paymentStatus === "PAID" && record.deliveryStatus === "DELIVERED"
       ? record.afterPurchaseNoteSnapshot
       : null,

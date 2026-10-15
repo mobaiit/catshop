@@ -16,7 +16,8 @@
               <div><dt class="text-xs text-muted-foreground">支付状态</dt><dd class="mt-1 font-medium">{{ paymentStatusLabel(order.paymentStatus) }}</dd></div>
             </dl>
             <div v-if="order.paymentStatus === 'UNPAID'" class="grid justify-items-center gap-4 border-t pt-6 text-center">
-              <template v-if="isQrPaymentOrder(order)">
+              <Alert v-if="isExpiredOwnpay" class="w-full text-left"><AlertTitle>支付已过期</AlertTitle><AlertDescription>该支付订单已结束，无法继续支付，请返回商店重新下单。</AlertDescription></Alert>
+              <template v-else-if="isQrPaymentOrder(order)">
                 <div v-if="payableAmount !== null" class="w-full rounded-xl border-2 border-primary/35 px-5 py-4 shadow-sm" aria-live="polite">
                   <p class="text-4xl font-bold tracking-tight text-primary sm:text-5xl"><span class="text-2xl sm:text-3xl">¥</span>{{ formatCentsAsYuan(payableAmount) }}</p>
                   <p class="mt-3 text-sm font-medium leading-6">请严格按此金额付款</p>
@@ -38,7 +39,7 @@
         </CardContent>
         <CardFooter v-if="order" class="flex-wrap justify-end gap-3 border-t pt-5">
           <Button v-if="order.paymentStatus === 'UNPAID' && order.paymentProvider === 'OWNPAY'" variant="destructive" :disabled="cancelling" @click="cancelOrder">{{ cancelling ? "正在取消..." : "取消订单并返回商店" }}</Button>
-          <Button v-if="order.paymentStatus === 'UNPAID' && isQrPaymentOrder(order)" variant="outline" :disabled="resuming" @click="resumePayment">{{ resuming ? "正在生成..." : "重新生成二维码" }}</Button>
+          <Button v-if="order.paymentStatus === 'UNPAID' && isQrPaymentOrder(order) && order.paymentProvider !== 'OWNPAY'" variant="outline" :disabled="resuming" @click="resumePayment">{{ resuming ? "正在生成..." : "重新生成二维码" }}</Button>
           <Button as-child><a :href="orderHref">查看订单</a></Button>
         </CardFooter>
       </Card>
@@ -75,6 +76,7 @@ const resuming = ref(false);
 const cancelling = ref(false);
 const orderHref = computed(() => `${guestEmail.value ? "/order" : "/account/order"}${orderNo ? `?orderNo=${encodeURIComponent(orderNo)}` : ""}`);
 const paymentChannelLabel = computed(() => order.value?.paymentChannel === "alipay" ? "支付宝" : order.value?.paymentChannel === "wechat" ? "微信" : "对应应用");
+const isExpiredOwnpay = computed(() => order.value?.paymentProvider === "OWNPAY" && expiresAt.value !== null && expiresAt.value <= now.value);
 const countdownLabel = computed(() => {
   const seconds = Math.max(0, Math.ceil(((expiresAt.value ?? now.value) - now.value) / 1000));
   return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
@@ -100,7 +102,9 @@ async function loadOrder() {
     order.value = record;
     if (record.paymentStatus === "UNPAID" && isQrPaymentOrder(record)) {
       restorePaymentSession(record.orderNo);
-      if ((!qrCode.value && !qrImageUrl.value) || (expiresAt.value !== null && expiresAt.value <= Date.now())) await resumePayment();
+      if (expiresAt.value === null && record.paymentExpiresAt !== null) expiresAt.value = record.paymentExpiresAt;
+      const ownpayExpired = record.paymentProvider === "OWNPAY" && expiresAt.value !== null && expiresAt.value <= Date.now();
+      if (!ownpayExpired && ((!qrCode.value && !qrImageUrl.value) || (expiresAt.value !== null && expiresAt.value <= Date.now()))) await resumePayment();
       startPolling();
     }
   } catch (cause) { error.value = userErrorMessage(cause); }
