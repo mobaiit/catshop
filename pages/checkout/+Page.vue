@@ -16,7 +16,7 @@
               <div><dt class="text-xs text-muted-foreground">支付状态</dt><dd class="mt-1 font-medium">{{ paymentStatusLabel(order.paymentStatus) }}</dd></div>
             </dl>
             <div v-if="order.paymentStatus === 'UNPAID'" class="grid justify-items-center gap-4 border-t pt-6 text-center">
-              <Alert v-if="isExpiredOwnpay" class="w-full text-left"><AlertTitle>支付已过期</AlertTitle><AlertDescription>该支付订单已结束，无法继续支付，请返回商店重新下单。</AlertDescription></Alert>
+              <Alert v-if="isEndedPayment" class="w-full text-left"><AlertTitle>支付已结束</AlertTitle><AlertDescription>该支付订单已结束，无法继续支付，请返回商店重新下单。</AlertDescription></Alert>
               <template v-else-if="isQrPaymentOrder(order)">
                 <div v-if="payableAmount !== null" class="w-full rounded-xl border-2 border-primary/35 px-5 py-4 shadow-sm" aria-live="polite">
                   <p class="text-4xl font-bold tracking-tight text-primary sm:text-5xl"><span class="text-2xl sm:text-3xl">¥</span>{{ formatCentsAsYuan(payableAmount) }}</p>
@@ -38,8 +38,8 @@
           <p v-else class="py-16 text-center text-sm text-muted-foreground">正在加载订单...</p>
         </CardContent>
         <CardFooter v-if="order" class="flex-wrap justify-end gap-3 border-t pt-5">
-          <Button v-if="order.paymentStatus === 'UNPAID' && order.paymentProvider === 'OWNPAY'" variant="destructive" :disabled="cancelling" @click="cancelOrder">{{ cancelling ? "正在取消..." : "取消订单并返回商店" }}</Button>
-          <Button v-if="order.paymentStatus === 'UNPAID' && isQrPaymentOrder(order) && order.paymentProvider !== 'OWNPAY'" variant="outline" :disabled="resuming" @click="resumePayment">{{ resuming ? "正在生成..." : "重新生成二维码" }}</Button>
+          <Button v-if="order.paymentStatus === 'UNPAID' && order.paymentProvider === 'OWNPAY'" variant="destructive" :disabled="cancelling" @click="cancelOrder">{{ cancelling ? "正在取消..." : isEndedPayment ? "返回商店重新下单" : "取消订单并返回商店" }}</Button>
+          <Button v-if="order.status === 'PENDING' && order.paymentStatus === 'UNPAID' && isQrPaymentOrder(order) && order.paymentProvider !== 'OWNPAY'" variant="outline" :disabled="resuming" @click="resumePayment">{{ resuming ? "正在生成..." : "重新生成二维码" }}</Button>
           <Button as-child><a :href="orderHref">查看订单</a></Button>
         </CardFooter>
       </Card>
@@ -77,6 +77,7 @@ const cancelling = ref(false);
 const orderHref = computed(() => `${guestEmail.value ? "/order" : "/account/order"}${orderNo ? `?orderNo=${encodeURIComponent(orderNo)}` : ""}`);
 const paymentChannelLabel = computed(() => order.value?.paymentChannel === "alipay" ? "支付宝" : order.value?.paymentChannel === "wechat" ? "微信" : "对应应用");
 const isExpiredOwnpay = computed(() => order.value?.paymentProvider === "OWNPAY" && expiresAt.value !== null && expiresAt.value <= now.value);
+const isEndedPayment = computed(() => Boolean(order.value && (order.value.status !== "PENDING" || isExpiredOwnpay.value)));
 const countdownLabel = computed(() => {
   const seconds = Math.max(0, Math.ceil(((expiresAt.value ?? now.value) - now.value) / 1000));
   return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
@@ -100,7 +101,7 @@ async function loadOrder() {
     const record = await runTelefunc(() => onQueryOrder(queryInput()), { notifyError: false });
     if (!record) { error.value = "订单不存在，或订单身份信息不匹配。"; return; }
     order.value = record;
-    if (record.paymentStatus === "UNPAID" && isQrPaymentOrder(record)) {
+    if (record.status === "PENDING" && record.paymentStatus === "UNPAID" && isQrPaymentOrder(record)) {
       restorePaymentSession(record.orderNo);
       if (expiresAt.value === null && record.paymentExpiresAt !== null) expiresAt.value = record.paymentExpiresAt;
       const ownpayExpired = record.paymentProvider === "OWNPAY" && expiresAt.value !== null && expiresAt.value <= Date.now();
@@ -143,6 +144,7 @@ async function resumePayment() {
 
 async function cancelOrder() {
   if (!order.value || cancelling.value) return;
+  if (order.value.status !== "PENDING") { clearPaymentSession(order.value.orderNo); window.location.assign("/"); return; }
   cancelling.value = true;
   error.value = null;
   try {

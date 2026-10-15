@@ -152,6 +152,7 @@ export class PaymentFlowService {
     if (!record) {
       const existing = await this.query(orderNo, ownerUserId, email);
       if (existing?.paymentStatus === "PAID") return { cancelled: false, paid: true };
+      if (existing && existing.status !== "PENDING") return { cancelled: true, paid: false };
       appError("ORDER_NOT_FOUND");
     }
     return this.cancelPending(record.id, record.orderNo);

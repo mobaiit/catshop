@@ -104,6 +104,7 @@
                 <div><dt class="text-xs text-muted-foreground">发货状态</dt><dd class="mt-1 font-medium">{{ deliveryStatusLabel(result.deliveryStatus) }}</dd></div>
               </dl>
 
+              <Alert v-if="isEndedPayment"><AlertTitle>支付已结束</AlertTitle><AlertDescription>该支付订单已结束，无法继续支付，请返回商店重新下单。</AlertDescription></Alert>
               <AfterPurchaseNote v-if="result.afterPurchaseNote" :note="result.afterPurchaseNote" />
               <div v-if="result.deliveries.length" class="min-w-0 border-t pt-6">
                 <p class="mb-3 font-medium">发货内容</p>
@@ -115,7 +116,7 @@
               </Alert>
             </CardContent>
             <CardFooter v-if="result.paymentStatus === 'UNPAID'" class="justify-end border-t pt-5">
-              <Button v-if="isFaceToFacePayment" as-child><a :href="`/checkout?orderNo=${encodeURIComponent(result.orderNo)}`">前往支付</a></Button><Button v-else :disabled="resumingPayment" @click="resumePayment">{{ resumingPayment ? "正在生成支付信息..." : "继续支付" }}</Button>
+              <Button v-if="isEndedPayment" as-child><a href="/">返回商店重新下单</a></Button><Button v-else-if="isFaceToFacePayment" as-child><a :href="`/checkout?orderNo=${encodeURIComponent(result.orderNo)}`">前往支付</a></Button><Button v-else :disabled="resumingPayment" @click="resumePayment">{{ resumingPayment ? "正在生成支付信息..." : "继续支付" }}</Button>
             </CardFooter>
           </Card>
 
@@ -210,7 +211,9 @@ const activeQuery = ref<{ orderNo: string; email?: string } | null>(null);
 const clearTarget = ref<string | null | undefined>(undefined);
 const recoveryChallengeId = ref("");
 const recoveryTruncated = ref(false);
-const isFaceToFacePayment = computed(() => result.value?.paymentChannel === "face_to_face");
+const isFaceToFacePayment = computed(() => result.value?.paymentProvider === "OWNPAY" || result.value?.paymentProvider === "PERPAY" || result.value?.paymentChannel === "face_to_face");
+const isExpiredOwnpay = computed(() => result.value?.paymentProvider === "OWNPAY" && result.value.paymentExpiresAt !== null && result.value.paymentExpiresAt <= Date.now());
+const isEndedPayment = computed(() => Boolean(result.value && (result.value.status !== "PENDING" || isExpiredOwnpay.value)));
 
 const { handleSubmit, isSubmitting: querySubmitting, setFieldValue } = useForm({
   validationSchema: toTypedSchema(z.object({
