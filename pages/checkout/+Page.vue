@@ -1,46 +1,114 @@
 <template>
-  <main class="min-h-screen bg-muted/30">
-    <header class="fixed inset-x-0 top-0 z-50 border-b bg-background/95 backdrop-blur">
-      <div class="mx-auto flex min-h-16 max-w-2xl items-center justify-between px-5"><StorefrontBrand /><PublicNav /></div>
+  <main class="relative min-h-dvh overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(244,114,182,0.10),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(139,92,246,0.10),transparent_36%)] bg-muted/25">
+    <div class="pointer-events-none absolute -left-24 top-24 size-72 rounded-full bg-pink-400/8 blur-3xl" aria-hidden="true" />
+    <div class="pointer-events-none absolute -right-28 bottom-8 size-80 rounded-full bg-violet-500/8 blur-3xl" aria-hidden="true" />
+    <header class="fixed inset-x-0 top-0 z-50 border-b bg-background/90 backdrop-blur-xl">
+      <div class="mx-auto flex min-h-16 max-w-5xl items-center justify-between px-4 sm:px-6">
+        <div @click.capture="handleBrandNavigation"><StorefrontBrand /></div>
+        <div class="inline-flex items-center gap-2 rounded-full border bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-xs">
+          <ShieldCheck class="size-4 text-violet-500" aria-hidden="true" />
+          安全收银台
+        </div>
+      </div>
     </header>
-    <section class="mx-auto max-w-2xl px-5 pb-12 pt-26">
-      <Card>
-        <CardHeader><CardTitle>订单支付</CardTitle><CardDescription>{{ order ? `订单号：${order.orderNo}` : "正在确认订单信息..." }}</CardDescription></CardHeader>
-        <CardContent class="flex flex-col gap-6">
-          <Alert v-if="error" variant="destructive"><AlertTitle>无法继续支付</AlertTitle><AlertDescription>{{ error }}</AlertDescription></Alert>
-          <template v-else-if="order">
-            <dl class="grid grid-cols-2 gap-x-6 gap-y-5 text-sm sm:grid-cols-3">
-              <div><dt class="text-xs text-muted-foreground">商品</dt><dd class="mt-1 font-medium">{{ order.productName }}</dd></div>
-              <div><dt class="text-xs text-muted-foreground">订单金额</dt><dd class="mt-1 font-medium">¥{{ order.amount }}</dd></div>
-              <div v-if="payableAmount !== null"><dt class="text-xs text-muted-foreground">实际应付</dt><dd class="mt-1 font-medium">¥{{ formatCentsAsYuan(payableAmount) }}</dd></div>
-              <div><dt class="text-xs text-muted-foreground">支付状态</dt><dd class="mt-1 font-medium">{{ paymentStatusLabel(order.paymentStatus) }}</dd></div>
-            </dl>
-            <div v-if="order.paymentStatus === 'UNPAID'" class="grid justify-items-center gap-4 border-t pt-6 text-center">
-              <Alert v-if="isEndedPayment" class="w-full text-left"><AlertTitle>支付已结束</AlertTitle><AlertDescription>该支付订单已结束，无法继续支付，请返回商店重新下单。</AlertDescription></Alert>
-              <template v-else-if="isQrPaymentOrder(order)">
-                <div v-if="payableAmount !== null" class="w-full rounded-xl border-2 border-primary/35 px-5 py-4 shadow-sm" aria-live="polite">
-                  <p class="text-4xl font-bold tracking-tight text-primary sm:text-5xl"><span class="text-2xl sm:text-3xl">¥</span>{{ formatCentsAsYuan(payableAmount) }}</p>
-                  <p class="mt-3 text-sm font-medium leading-6">请严格按此金额付款</p>
+    <section class="relative mx-auto max-w-5xl px-4 pb-12 pt-24 sm:px-6 sm:pb-16 sm:pt-28">
+      <Card class="overflow-hidden border-border/70 bg-card/95 shadow-[0_24px_80px_-32px_rgba(76,29,149,0.28)] backdrop-blur">
+        <CardContent class="p-0">
+          <Alert v-if="error" variant="destructive" class="m-4 sm:m-6"><AlertTitle>无法继续支付</AlertTitle><AlertDescription>{{ error }}</AlertDescription></Alert>
+
+          <div v-else-if="order" class="grid lg:grid-cols-[minmax(0,0.82fr)_minmax(25rem,1.18fr)]">
+            <section class="order-2 flex min-w-0 flex-col bg-muted/35 p-6 sm:p-8 lg:order-1 lg:border-r lg:p-10" aria-labelledby="checkout-order-title">
+              <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                  <p class="text-xs font-semibold tracking-[0.18em] text-violet-600 uppercase dark:text-violet-300">Catshop Checkout</p>
+                  <h1 id="checkout-order-title" class="mt-3 text-2xl font-semibold tracking-tight">确认订单</h1>
                 </div>
-                <p class="font-medium">请使用{{ paymentChannelLabel }}扫码付款</p>
-                <div class="w-full max-w-72">
-                  <img v-if="qrImageUrl" :src="qrImageUrl" class="aspect-square w-full rounded-lg border bg-white object-contain p-2" alt="支付二维码" />
-                  <PaymentQrCode v-else-if="qrCode" :value="qrCode" />
-                  <p v-else class="py-16 text-sm text-muted-foreground">正在准备收款二维码...</p>
+                <span class="shrink-0 rounded-full border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">{{ paymentStatusLabel(order.paymentStatus) }}</span>
+              </div>
+
+              <div class="mt-8 rounded-2xl border bg-background/90 p-5 shadow-sm">
+                <p class="text-xs font-medium text-muted-foreground">购买商品</p>
+                <p class="mt-2 text-lg font-semibold leading-7">{{ order.productName }}</p>
+                <dl class="mt-6 grid gap-4 border-t pt-5 text-sm">
+                  <div class="flex items-center justify-between gap-4"><dt class="text-muted-foreground">订单金额</dt><dd class="font-semibold tabular-nums">¥{{ order.amount }}</dd></div>
+                  <div class="flex items-start justify-between gap-4"><dt class="shrink-0 text-muted-foreground">订单号</dt><dd class="min-w-0 break-all text-right font-mono text-xs leading-5">{{ order.orderNo }}</dd></div>
+                  <div class="flex items-center justify-between gap-4"><dt class="text-muted-foreground">支付方式</dt><dd class="font-medium">{{ paymentChannelLabel }}</dd></div>
+                </dl>
+              </div>
+
+              <div class="mt-6 grid gap-3 text-sm text-muted-foreground">
+                <div class="flex items-start gap-3"><ShieldCheck class="mt-0.5 size-4 shrink-0 text-violet-500" aria-hidden="true" /><span>支付信息经过安全校验，请确认金额后付款。</span></div>
+                <div class="flex items-start gap-3"><CircleCheckBig class="mt-0.5 size-4 shrink-0 text-violet-500" aria-hidden="true" /><span>支付完成后自动确认，无需手动刷新页面。</span></div>
+              </div>
+            </section>
+
+            <section class="order-1 flex min-h-[34rem] min-w-0 flex-col items-center justify-center p-6 text-center sm:p-10 lg:order-2 lg:p-12" aria-labelledby="checkout-payment-title">
+              <template v-if="order.paymentStatus === 'UNPAID' && !isEndedPayment && isQrPaymentOrder(order)">
+                <div
+                  class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold"
+                  :class="isWechatPayment ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'border-blue-500/25 bg-blue-500/10 text-blue-700 dark:text-blue-300'"
+                >
+                  <ScanLine class="size-4" aria-hidden="true" />
+                  {{ paymentChannelLabel }}扫码支付
                 </div>
-                <p v-if="expiresAt" class="text-sm font-medium" role="timer">二维码将在 {{ countdownLabel }} 后失效</p>
-                <p class="text-xs text-muted-foreground">支付完成后，页面会自动更新订单状态。</p>
+                <p class="mt-7 text-sm font-medium text-muted-foreground">实际应付</p>
+                <p id="checkout-payment-title" class="mt-1 text-4xl font-bold tracking-tight tabular-nums sm:text-5xl">
+                  <span class="mr-1 text-2xl font-semibold text-muted-foreground sm:text-3xl">¥</span>{{ payableAmount !== null ? formatCentsAsYuan(payableAmount) : order.amount }}
+                </p>
+                <p v-if="payableAmount !== null" class="mt-3 text-sm text-muted-foreground">请严格按照此金额付款</p>
+
+                <div
+                  class="mt-7 w-full max-w-72 rounded-[1.75rem] border p-3 shadow-[0_18px_50px_-24px_rgba(15,23,42,0.35)]"
+                  :class="isWechatPayment ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-blue-500/30 bg-blue-500/5'"
+                >
+                  <div class="grid aspect-square w-full place-items-center overflow-hidden rounded-2xl bg-white p-2">
+                    <img v-if="qrImageUrl" :src="qrImageUrl" width="256" height="256" class="aspect-square w-full object-contain" :alt="`${paymentChannelLabel}支付二维码`" />
+                    <PaymentQrCode v-else-if="qrCode" :value="qrCode" :label="`${paymentChannelLabel}支付二维码`" />
+                    <div v-else class="grid size-full place-items-center" role="status">
+                      <div class="grid gap-3 text-sm text-slate-500"><ScanLine class="mx-auto size-8 animate-pulse motion-reduce:animate-none" aria-hidden="true" /><span>正在准备收款二维码...</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  v-if="expiresAt"
+                  class="mt-6 inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold tabular-nums"
+                  :class="countdownUrgent ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300' : isWechatPayment ? 'border-emerald-500/20 bg-emerald-500/8 text-emerald-700 dark:text-emerald-300' : 'border-blue-500/20 bg-blue-500/8 text-blue-700 dark:text-blue-300'"
+                  role="timer"
+                  aria-live="off"
+                ><Clock3 class="size-4" aria-hidden="true" />{{ countdownLabel }} 后失效</div>
+                <p class="mt-4 text-xs leading-5 text-muted-foreground">请勿重复付款，到账后页面会自动更新。</p>
               </template>
-              <p v-else class="text-sm text-muted-foreground">该订单不使用站内扫码支付，请返回订单页继续支付。</p>
-            </div>
-            <Alert v-else><AlertTitle>{{ order.paymentStatus === "PAID" ? "支付成功" : "订单已结束" }}</AlertTitle><AlertDescription>{{ order.paymentStatus === "PAID" ? "支付已确认，可返回订单查看发货进度。" : "该订单当前无法继续支付。" }}</AlertDescription></Alert>
-          </template>
-          <p v-else class="py-16 text-center text-sm text-muted-foreground">正在加载订单...</p>
+
+              <div v-else-if="order.paymentStatus === 'PAID'" class="grid max-w-sm justify-items-center gap-4" aria-live="polite">
+                <div class="grid size-20 place-items-center rounded-full bg-emerald-500/12 text-emerald-600 dark:text-emerald-300"><CircleCheckBig class="size-10" aria-hidden="true" /></div>
+                <h2 id="checkout-payment-title" class="text-2xl font-semibold">支付成功</h2>
+                <p class="leading-7 text-muted-foreground">支付已确认，可以前往订单页面查看发货进度和交付内容。</p>
+              </div>
+
+              <div v-else-if="isEndedPayment" class="grid max-w-sm justify-items-center gap-4" aria-live="polite">
+                <div class="grid size-20 place-items-center rounded-full bg-muted text-muted-foreground"><Clock3 class="size-9" aria-hidden="true" /></div>
+                <h2 id="checkout-payment-title" class="text-2xl font-semibold">支付已结束</h2>
+                <p class="leading-7 text-muted-foreground">该支付订单已结束，无法继续支付，请返回商店重新下单。</p>
+              </div>
+
+              <div v-else class="grid max-w-sm justify-items-center gap-4">
+                <div class="grid size-20 place-items-center rounded-full bg-muted text-muted-foreground"><ScanLine class="size-9" aria-hidden="true" /></div>
+                <h2 id="checkout-payment-title" class="text-xl font-semibold">暂时无法展示二维码</h2>
+                <p class="leading-7 text-muted-foreground">该订单不使用站内扫码支付，请返回订单页继续支付。</p>
+              </div>
+            </section>
+          </div>
+
+          <div v-else class="grid min-h-[34rem] place-items-center p-6 text-center" role="status">
+            <div class="grid justify-items-center gap-4 text-muted-foreground"><div class="size-12 animate-pulse rounded-full bg-violet-500/15 motion-reduce:animate-none" /><p>正在确认订单信息...</p></div>
+          </div>
         </CardContent>
-        <CardFooter v-if="order" class="flex-wrap justify-end gap-3 border-t pt-5">
-          <Button v-if="order.paymentStatus === 'UNPAID' && order.paymentProvider === 'OWNPAY'" variant="destructive" :disabled="cancelling" @click="cancelOrder">{{ cancelling ? "正在取消..." : isEndedPayment ? "返回商店重新下单" : "取消订单并返回商店" }}</Button>
-          <Button v-if="order.status === 'PENDING' && order.paymentStatus === 'UNPAID' && isQrPaymentOrder(order) && order.paymentProvider !== 'OWNPAY'" variant="outline" :disabled="resuming" @click="resumePayment">{{ resuming ? "正在生成..." : "重新生成二维码" }}</Button>
-          <Button as-child><a :href="orderHref">查看订单</a></Button>
+        <CardFooter v-if="order" class="min-h-20 flex-wrap justify-center gap-3 border-t bg-background/80 px-6 py-4 sm:justify-end">
+          <Button v-if="order.paymentStatus === 'UNPAID' && order.paymentProvider === 'OWNPAY'" variant="outline" class="min-h-11 w-full text-muted-foreground hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive sm:w-auto" :disabled="cancelling" @click="cancelOrder">{{ cancelling ? "正在取消..." : isEndedPayment ? "返回商店重新下单" : "取消订单并返回商店" }}</Button>
+          <Button v-else-if="order.status === 'PENDING' && order.paymentStatus === 'UNPAID' && isQrPaymentOrder(order)" variant="outline" class="min-h-11 w-full sm:w-auto" :disabled="resuming" @click="resumePayment">{{ resuming ? "正在生成..." : "重新生成二维码" }}</Button>
+          <Button v-else-if="order.paymentStatus === 'PAID'" as-child class="min-h-11 w-full bg-gradient-to-r from-pink-500 to-violet-600 text-white shadow-sm hover:from-pink-500/90 hover:to-violet-600/90 sm:w-auto"><a :href="orderHref">查看订单</a></Button>
+          <Button v-else as-child variant="outline" class="min-h-11 w-full sm:w-auto"><a href="/">返回商店重新下单</a></Button>
         </CardFooter>
       </Card>
     </section>
@@ -49,13 +117,13 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { CircleCheckBig, Clock3, ScanLine, ShieldCheck } from "@lucide/vue";
 import { usePageContext } from "vike-vue/usePageContext";
 import PaymentQrCode from "@/components/PaymentQrCode.vue";
-import PublicNav from "@/components/storefront/PublicNav.vue";
 import StorefrontBrand from "@/components/storefront/StorefrontBrand.vue";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { formatCentsAsYuan } from "@/lib/payment-utils";
 import { getLocalOrderGroups } from "@/lib/local-orders";
 import { runTelefunc, userErrorMessage } from "@/lib/telefunc-client";
@@ -75,9 +143,11 @@ const error = ref<string | null>(null);
 const resuming = ref(false);
 const cancelling = ref(false);
 const orderHref = computed(() => `${guestEmail.value ? "/order" : "/account/order"}${orderNo ? `?orderNo=${encodeURIComponent(orderNo)}` : ""}`);
-const paymentChannelLabel = computed(() => order.value?.paymentChannel === "alipay" ? "支付宝" : order.value?.paymentChannel === "wechat" ? "微信" : "对应应用");
+const paymentChannelLabel = computed(() => order.value?.paymentChannel === "alipay" || order.value?.paymentChannel === "face_to_face" ? "支付宝" : order.value?.paymentChannel === "wechat" || order.value?.paymentChannel === "wxpay" ? "微信" : "对应应用");
+const isWechatPayment = computed(() => order.value?.paymentChannel === "wechat" || order.value?.paymentChannel === "wxpay");
 const isExpiredOwnpay = computed(() => order.value?.paymentProvider === "OWNPAY" && expiresAt.value !== null && expiresAt.value <= now.value);
 const isEndedPayment = computed(() => Boolean(order.value && (order.value.status !== "PENDING" || isExpiredOwnpay.value)));
+const countdownUrgent = computed(() => expiresAt.value !== null && expiresAt.value - now.value <= 60_000);
 const countdownLabel = computed(() => {
   const seconds = Math.max(0, Math.ceil(((expiresAt.value ?? now.value) - now.value) / 1000));
   return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
@@ -93,6 +163,13 @@ onMounted(() => {
   void loadOrder();
 });
 onBeforeUnmount(() => { stopPolling(); if (clockTimer) clearInterval(clockTimer); });
+
+function handleBrandNavigation(event: MouseEvent) {
+  if (!order.value || order.value.paymentProvider !== "OWNPAY" || order.value.paymentStatus !== "UNPAID" || isEndedPayment.value) return;
+  event.preventDefault();
+  event.stopPropagation();
+  void cancelOrder();
+}
 
 function queryInput() { return { orderNo, ...(guestEmail.value ? { email: guestEmail.value } : {}) }; }
 
