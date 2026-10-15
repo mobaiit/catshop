@@ -2,7 +2,7 @@ import { env } from "./env";
 import { getTurnstileConfig } from "@/lib/turnstile-config";
 import type { RuntimeAdapter } from "@universal-middleware/core";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthMiddleware, getAuthoritativeSessionFromCtx } from "better-auth/api";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { sql } from "drizzle-orm";
 import { captcha, twoFactor } from "better-auth/plugins";
@@ -99,7 +99,8 @@ export function getAuthConfig(runtime?: RuntimeAdapter, publicOrigin?: string, o
         if (ctx.path === "/change-email") {
           if (!database) throw new APIError("INTERNAL_SERVER_ERROR", { message: "Email change settings are unavailable." });
 
-          const userId = ctx.context.session?.user.id;
+          const authSession = await getAuthoritativeSessionFromCtx(ctx);
+          const userId = authSession?.user.id;
           const newEmail = typeof ctx.body?.newEmail === "string" ? ctx.body.newEmail.trim().toLowerCase() : "";
           if (!userId) throw new APIError("UNAUTHORIZED", { message: "Authentication is required." });
           if (!newEmail) throw new APIError("BAD_REQUEST", { message: "A new email is required." });
