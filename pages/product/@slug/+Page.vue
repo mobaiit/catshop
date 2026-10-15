@@ -4,7 +4,9 @@
     <div class="mt-16 flex min-h-0 flex-1 flex-col overflow-y-auto">
       <section class="mx-auto grid w-full max-w-6xl flex-1 gap-8 px-5 pb-10 pt-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <article>
-          <div class="overflow-hidden rounded-xl border bg-muted"><img :src="data.coverImage || defaultProductImage" :alt="data.name" class="max-h-96 w-full object-cover" /></div>
+          <div class="grid h-[min(24rem,75vw)] place-items-center overflow-hidden rounded-xl border bg-muted/50">
+            <img :src="data.coverImage || defaultProductImage" :alt="data.name" class="size-full object-contain" />
+          </div>
           <div class="mt-5">
             <Badge variant="secondary">{{ data.categoryName || messages.productCheckout.defaultCategory }}</Badge>
             <h1 class="mt-3 text-2xl font-semibold tracking-normal sm:text-3xl">{{ data.name }}</h1>
