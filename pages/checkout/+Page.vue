@@ -70,6 +70,16 @@
                   </div>
                 </div>
 
+                <div class="mt-4 flex w-full max-w-72 flex-col gap-2 sm:flex-row">
+                  <Button type="button" variant="outline" class="min-h-11 flex-1" @click="saveQrCode">
+                    <Download class="size-4" aria-hidden="true" />保存二维码
+                  </Button>
+                  <Button v-if="alipayLaunchUrl" as-child class="min-h-11 flex-1 bg-blue-600 text-white hover:bg-blue-600/90">
+                    <a :href="alipayLaunchUrl">打开支付宝</a>
+                  </Button>
+                </div>
+                <p class="mt-3 max-w-72 text-xs leading-5 text-muted-foreground sm:hidden">{{ mobilePaymentHint }}</p>
+
                 <div
                   v-if="expiresAt"
                   class="mt-6 inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold tabular-nums"
@@ -117,7 +127,8 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { CircleCheckBig, Clock3, ScanLine, ShieldCheck } from "@lucide/vue";
+import { CircleCheckBig, Clock3, Download, ScanLine, ShieldCheck } from "@lucide/vue";
+import QRCode from "qrcode";
 import { usePageContext } from "vike-vue/usePageContext";
 import PaymentQrCode from "@/components/PaymentQrCode.vue";
 import StorefrontBrand from "@/components/storefront/StorefrontBrand.vue";
@@ -142,9 +153,20 @@ const now = ref(Date.now());
 const error = ref<string | null>(null);
 const resuming = ref(false);
 const cancelling = ref(false);
+const isWechatClient = ref(false);
+const isAlipayClient = ref(false);
 const orderHref = computed(() => `${guestEmail.value ? "/order" : "/account/order"}${orderNo ? `?orderNo=${encodeURIComponent(orderNo)}` : ""}`);
 const paymentChannelLabel = computed(() => order.value?.paymentChannel === "alipay" || order.value?.paymentChannel === "face_to_face" ? "支付宝" : order.value?.paymentChannel === "wechat" || order.value?.paymentChannel === "wxpay" ? "微信" : "对应应用");
 const isWechatPayment = computed(() => order.value?.paymentChannel === "wechat" || order.value?.paymentChannel === "wxpay");
+const alipayLaunchUrl = computed(() => {
+  if (paymentChannelLabel.value !== "支付宝" || !/^https?:\/\//i.test(qrCode.value)) return "";
+  return `alipays://platformapi/startapp?saId=10000007&qrcode=${encodeURIComponent(qrCode.value)}`;
+});
+const mobilePaymentHint = computed(() => {
+  if (isWechatPayment.value) return isWechatClient.value ? "可长按二维码识别并完成微信支付。" : "请长按或保存二维码，再打开微信扫一扫并从相册选择。";
+  if (isAlipayClient.value) return "可长按二维码识别；若浏览器允许，也可使用“打开支付宝”。";
+  return alipayLaunchUrl.value ? "可尝试打开支付宝；若被浏览器拦截，请保存二维码后在支付宝扫一扫中从相册选择。" : "请长按或保存二维码，再打开支付宝扫一扫并从相册选择。";
+});
 const isExpiredOwnpay = computed(() => order.value?.paymentProvider === "OWNPAY" && expiresAt.value !== null && expiresAt.value <= now.value);
 const isEndedPayment = computed(() => Boolean(order.value && (order.value.status !== "PENDING" || isExpiredOwnpay.value)));
 const countdownUrgent = computed(() => expiresAt.value !== null && expiresAt.value - now.value <= 60_000);
@@ -156,6 +178,8 @@ let pollTimer: ReturnType<typeof setInterval> | undefined;
 let clockTimer: ReturnType<typeof setInterval> | undefined;
 
 onMounted(() => {
+  isWechatClient.value = /MicroMessenger/i.test(navigator.userAgent);
+  isAlipayClient.value = /AlipayClient/i.test(navigator.userAgent);
   clockTimer = setInterval(() => { now.value = Date.now(); }, 1000);
   if (!orderNo) { error.value = "缺少订单号，请返回商店重新下单。"; return; }
   guestEmail.value = Object.entries(getLocalOrderGroups()).find(([, orders]) => orders.some(item => item.orderNo === orderNo))?.[0];
@@ -230,6 +254,20 @@ async function cancelOrder() {
     if (result.cancelled) { clearPaymentSession(order.value.orderNo); window.location.assign("/"); return; }
     error.value = "订单未能取消，请稍后重试。";
   } catch (cause) { error.value = userErrorMessage(cause, "订单未能取消，请稍后重试。"); } finally { cancelling.value = false; }
+}
+
+async function saveQrCode() {
+  let href = qrImageUrl.value;
+  if (qrCode.value) href = await QRCode.toDataURL(qrCode.value, { errorCorrectionLevel: "M", margin: 1, width: 512 });
+  if (!href) return;
+  const link = document.createElement("a");
+  link.href = href;
+  link.download = `${paymentChannelLabel.value}-支付二维码.png`;
+  link.rel = "noopener";
+  if (/^https?:\/\//i.test(href)) link.target = "_blank";
+  document.body.append(link);
+  link.click();
+  link.remove();
 }
 
 function restorePaymentSession(value: string) {

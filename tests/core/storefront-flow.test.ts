@@ -42,7 +42,7 @@ function insertFixtures(sqlite: Database, identity: FlowIdentity) {
     .run(JSON.stringify({ schemaVersion: 1, kind: "cloudflare", from: "shop@example.com" }), now, now);
   for (const scene of ["ORDER_PAID", "DELIVERY_SUCCESS"] as const) {
     sqlite.query("INSERT INTO emailTemplate (scene, name, templateJson, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)")
-      .run(scene, scene, JSON.stringify({ schemaVersion: 1, format: "text", subject: `${scene} {{orderNo}}`, body: "{{queryUrl}}\n{{deliveryItems}}" }), now, now);
+      .run(scene, scene, JSON.stringify({ schemaVersion: 1, format: "text", subject: `${scene} {{orderNo}}`, body: "{{queryUrl}}\n{{deliveryItems}}\n{{afterPurchaseNote}}" }), now, now);
   }
 }
 
@@ -97,6 +97,7 @@ async function runStorefrontFlow(identity: FlowIdentity) {
   ]);
   expect(sent.every((message) => message.to === identity.email)).toBe(true);
   expect(sent[1]?.text).toContain("LICENSE-CORE-001");
+  expect(sent[1]?.text).toContain("Provider: https://provider.example.com");
 
   return { context, created };
 }

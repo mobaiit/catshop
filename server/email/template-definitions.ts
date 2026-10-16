@@ -93,6 +93,7 @@ export const emailTemplateDefinitions: readonly EmailTemplateDefinition[] = [
       { key: "quantity", label: "购买数量", example: "1" },
       { key: "buyerNote", label: "买家备注", example: "请尽快发货。" },
       { key: "deliveryItems", label: "发货内容", example: "CARD-KEY-123456" },
+      { key: "afterPurchaseNote", label: "购买后说明", example: "Provider 地址：https://provider.example.com" },
       { key: "queryUrl", label: "订单查询地址", example: "https://example.com/order?orderNo=CFFK202608080001" },
       { key: "footerText", label: "页脚文本", example: "感谢您的购买。" },
       { key: "supportContact", label: "客服联系方式", example: "support@example.com" },

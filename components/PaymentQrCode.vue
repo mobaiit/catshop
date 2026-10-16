@@ -1,5 +1,5 @@
 <template>
-  <canvas ref="canvas" class="mx-auto rounded-md bg-white p-2" :aria-label="props.label" role="img" />
+  <img v-if="imageUrl" :src="imageUrl" width="240" height="240" class="mx-auto rounded-md bg-white p-2" :alt="props.label" />
 </template>
 
 <script lang="ts" setup>
@@ -7,11 +7,11 @@ import QRCode from "qrcode";
 import { onMounted, ref, watch } from "vue";
 
 const props = withDefaults(defineProps<{ value: string; label?: string }>(), { label: "支付二维码" });
-const canvas = ref<HTMLCanvasElement | null>(null);
+const imageUrl = ref("");
 
 async function renderCode() {
-  if (!canvas.value || !props.value) return;
-  await QRCode.toCanvas(canvas.value, props.value, { errorCorrectionLevel: "M", margin: 1, width: 224, color: { dark: "#111827", light: "#ffffff" } });
+  if (!props.value) { imageUrl.value = ""; return; }
+  imageUrl.value = await QRCode.toDataURL(props.value, { errorCorrectionLevel: "M", margin: 1, width: 224, color: { dark: "#111827", light: "#ffffff" } });
 }
 
 onMounted(() => { void renderCode(); });

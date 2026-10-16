@@ -27,7 +27,7 @@ export const smtpEmailConfig = {
 
 export const deliverySuccessTemplate = {
   subject: "{{siteName}} - Your order {{orderNo}} has been delivered",
-  body: "Order: {{orderNo}}\nProduct: {{productName}}\nItems:\n{{deliveryItems}}",
+  body: "Order: {{orderNo}}\nProduct: {{productName}}\nItems:\n{{deliveryItems}}\n\nAfter-purchase note:\n{{afterPurchaseNote}}",
   format: "text",
-  variables: ["siteName", "orderNo", "productName", "deliveryItems"],
+  variables: ["siteName", "orderNo", "productName", "deliveryItems", "afterPurchaseNote"],
 } satisfies EmailTemplateConfig;
